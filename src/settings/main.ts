@@ -905,7 +905,7 @@ function generalSection(): HTMLElement {
     style: "width:72px",
   }) as HTMLInputElement;
   autoClose.addEventListener("change", () => {
-    settings.autoCloseInterval = Math.max(5, Math.min(120, Number(autoClose.value) || 15));
+    settings.autoCloseInterval = Math.max(5, Math.min(120, Number(autoClose.value) || 120));
     autoClose.value = String(settings.autoCloseInterval);
     void save();
   });

@@ -479,16 +479,16 @@ fn hide(app: &AppHandle, d: &Desktop) {
 fn refresh(app: &AppHandle, d: &Desktop) {
     let (active, ignore, shape) = {
         let mut i = d.inner.lock().unwrap();
-        let active = i.shown && (i.carry.is_some() || (i.landed && !i.asleep));
+        let active = i.shown && (i.carry.is_some() || i.landed);
         // Poll mode: Some(flag) is decided here; None leaves it to the poll.
         let ignore = if !i.shown || (!i.landed && i.carry.is_none()) {
             Some(true)
         } else if let Some(c) = i.carry {
             Some(c.from == Source::Island)
         } else if i.asleep {
-            // Asleep, nothing polls: the whole little window takes the mouse
-            // and acts as his own wake area — the first move over it wakes
-            // him, and the poll gives the rest back right away.
+            // Keep the window receptive while asleep. The cursor poll also
+            // stays active and wakes Mochi if transparent-window hit testing
+            // fails.
             Some(false)
         } else {
             None

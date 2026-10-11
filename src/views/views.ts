@@ -46,7 +46,6 @@ export interface ViewActions {
   answerInTerminal(): void;
   toggleSound(): void;
   setVolume(v: number): void;
-  setAutoClose(seconds: number): void;
   openSettingsWindow(): void;
   blip(): void;
   /** Wardrobe click: keeps the outfit ("auto" and "none" included). */
@@ -732,9 +731,6 @@ function buildSettings(actions: ViewActions): ViewHost {
     oninput: (e: Event) => actions.setVolume(Number((e.target as HTMLInputElement).value)),
   }) as HTMLInputElement;
   const autoLabel = h("span", {});
-  const segButtons = [10, 15, 30].map((s) =>
-    h("button", { onclick: () => actions.setAutoClose(s) }, `${s}s`),
-  );
   const claudeBadge = h("span", { class: "status-badge" });
   const apiBadge = h("span", { class: "status-badge" });
 
@@ -747,7 +743,6 @@ function buildSettings(actions: ViewActions): ViewHost {
       { class: "settings-row" },
       svg(ICONS.timer, 12),
       autoLabel,
-      h("div", { class: "seg" }, ...segButtons),
     ),
     h(
       "div",
@@ -775,7 +770,6 @@ function buildSettings(actions: ViewActions): ViewHost {
       volume.value = String(s.soundVolume);
       volume.style.opacity = s.soundEnabled ? "1" : "0.4";
       autoLabel.textContent = t("Auto-close · {seconds}s", { seconds: Math.round(s.autoCloseInterval) });
-      segButtons.forEach((b, i) => b.classList.toggle("on", s.autoCloseInterval === [10, 15, 30][i]));
       clear(claudeBadge);
       claudeBadge.append(
         dot(s.hooksInstalled ? "#22C55E" : "#F4505E", 6),

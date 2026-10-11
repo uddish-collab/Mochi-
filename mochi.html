@@ -24,10 +24,30 @@
         height: 120px;
         transition: opacity 0.45s ease-in-out;
       }
+      #wake-mochi {
+        position: absolute;
+        z-index: 1;
+        top: 49px;
+        left: 50%;
+        transform: translateX(-50%);
+        box-sizing: border-box;
+        width: 50px;
+        height: 22px;
+        border: 1px solid #60465f;
+        border-radius: 999px;
+        padding: 0 3px;
+        background: #fff8ee;
+        color: #332b37;
+        font: 600 10px system-ui, sans-serif;
+        cursor: pointer;
+        box-shadow: 0 2px 8px #0003;
+      }
+      #wake-mochi[hidden] { display: none; }
     </style>
   </head>
   <body>
     <canvas id="mochi"></canvas>
+    <button id="wake-mochi" type="button" hidden>Wake up</button>
     <script type="module" src="/src/desktop/main.ts"></script>
   </body>
 </html>

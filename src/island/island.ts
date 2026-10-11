@@ -455,12 +455,6 @@ export class Island {
         void Bridge.saveSettings(State.settings);
         State.notify();
       },
-      setAutoClose: (s) => {
-        State.settings.autoCloseInterval = s;
-        this.fsm.homeToPetitDelay = s;
-        void Bridge.saveSettings(State.settings);
-        State.notify();
-      },
       openSettingsWindow: () => void Bridge.openSettingsWindow(),
       blip: () => Sound.play("blip"),
       chooseOutfit: (selection) => {

@@ -13,7 +13,7 @@ import { Sound } from "../core/sound";
 import { BotEngine } from "../mochi/engine";
 import {
   DESKTOP_EVENTS, DOUBLE_CLICK_MS, DRAG_THRESHOLD, PANEL_SIZE, agentActive, gaze, isOverBody,
-  layerDragTopLeft, lookOrigin, pointerDistance, shouldSleep, windowDragTopLeft,
+  layerDragTopLeft, lookOrigin, pointerDistance, shouldSleep, SLEEP_TIMEOUT, windowDragTopLeft,
   type DesktopSnapshot, type Point,
 } from "../mochi/desktop-logic";
 
@@ -60,6 +60,8 @@ class DesktopMochi {
   private dragTopLeft: Point | null = null;
   private moveFrame = false;
   private pokeTimer: number | null = null;
+  private manualWakeUntil = -Infinity;
+  private wakeOptionAvailable = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -140,7 +142,7 @@ class DesktopMochi {
     if (this.snap.dancing && !this.snap.paused) this.lastAgentActive = now;
     const distance = pointerDistance(this.mode === "poll", this.cursor, now - this.lastPointer);
     const sleep =
-      !this.dragging &&
+      !this.dragging && now >= this.manualWakeUntil &&
       (this.snap.paused || shouldSleep((now - this.lastAgentActive) / 1000, distance));
     if (sleep === this.asleep) return;
     this.asleep = sleep;
@@ -154,14 +156,28 @@ class DesktopMochi {
 
   private wake() {
     if (!this.asleep) return;
-    this.updateSleep(performance.now());
+    const now = performance.now();
+    this.lastAgentActive = now;
+    this.manualWakeUntil = now + SLEEP_TIMEOUT * 1000;
+    this.hideWakeButton();
+    this.updateSleep(now);
+  }
+
+  private hideWakeButton() {
+    const button = document.getElementById("wake-mochi");
+    if (button instanceof HTMLButtonElement) button.hidden = true;
   }
 
   /** Pointer in window coordinates: his eyes, and waking up. */
   private notePointer(p: Point) {
     this.cursor = p;
     this.lastPointer = performance.now();
-    if (this.asleep) this.wake();
+    if (this.asleep) {
+      this.wakeOptionAvailable = true;
+      this.wake();
+    } else if (!isOverBody(p)) {
+      this.wakeOptionAvailable = false;
+    }
     this.schedule();
   }
 
@@ -232,6 +248,8 @@ class DesktopMochi {
     document.addEventListener("pointerdown", (e) => {
       Sound.resume();
       if (e.button !== 0 || !isOverBody(this.local(e))) return;
+      this.wake();
+      this.wakeOptionAvailable = false;
       this.press = { client: this.local(e), screen: { x: e.screenX, y: e.screenY } };
       this.dragging = false;
       try {
@@ -280,10 +298,26 @@ class DesktopMochi {
 
     document.addEventListener("contextmenu", (e) => {
       e.preventDefault();
-      if (isOverBody(this.local(e))) void emitToWindow(ISLAND, DESKTOP_EVENTS.wardrobe);
+      if (!isOverBody(this.local(e))) return;
+      if (this.asleep || this.wakeOptionAvailable) {
+        const button = document.getElementById("wake-mochi");
+        if (button instanceof HTMLButtonElement) button.hidden = false;
+      } else {
+        void emitToWindow(ISLAND, DESKTOP_EVENTS.wardrobe);
+      }
+    });
+
+    const wakeButton = document.getElementById("wake-mochi");
+    wakeButton?.addEventListener("pointerdown", (e) => e.stopPropagation());
+    wakeButton?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.wake();
+      this.wakeOptionAvailable = false;
+      this.hideWakeButton();
     });
 
     document.addEventListener("pointerleave", () => {
+      if (!this.dragging) this.wakeOptionAvailable = false;
       if (this.mode !== "poll" && !this.dragging) this.cursor = null;
     });
 

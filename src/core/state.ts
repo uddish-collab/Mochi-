@@ -167,7 +167,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   soundEnabled: true,
   soundVolume: 0.12,
-  autoCloseInterval: 5,
+  autoCloseInterval: 120,
   openOnHover: false,
   absenceInterval: 180,
   activeIntegrations: [
