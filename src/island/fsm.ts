@@ -158,9 +158,13 @@ export class IslandStateMachine {
 
   private schedulePetitHide() {
     this.clear("petitHide");
-    // Keep the compact island available until the user explicitly dismisses it.
-    // The hidden state shrinks the native window to the wake strip, which looks
-    // like Mochi disappeared even though the process is still running.
+    // A card folded away while it waits for an answer keeps the compact island
+    // on screen, so it can be reopened (isHeldOpen on macOS).
+    if (this.pinned) return;
+    this.petitHide = window.setTimeout(() => {
+      this.petitHide = null;
+      if (this.state === "petit" && !this.pinned) this.transition("hidden");
+    }, this.petitToHiddenDelay * 1000);
   }
 
   private scheduleHomeCollapse() {
