@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "Mochi"
-version = "1.0.0"
+version = "3.0.0"
 dependencies = [
  "keyring",
  "reqwest 0.12.28",
@@ -590,7 +590,7 @@ dependencies = [
 
 [[package]]
 name = "coucou-hook"
-version = "1.0.0"
+version = "3.0.0"
 dependencies = [
  "serde_json",
  "windows 0.61.3",
