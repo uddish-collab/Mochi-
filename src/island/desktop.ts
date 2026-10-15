@@ -7,7 +7,6 @@ import { Bridge, emitToWindow, onEvent, type DesktopMode } from "../core/bridge"
 import type { BotEmoteName } from "../core/layout";
 import { Sound } from "../core/sound";
 import { State } from "../core/state";
-import { desktopDances } from "../core/spotify";
 import {
   DESKTOP_EVENTS, DesktopMochiController, alertActive, type DesktopSnapshot,
 } from "../mochi/desktop-logic";
@@ -171,7 +170,6 @@ export class DesktopLink {
       soundEnabled: State.settings.soundEnabled,
       soundVolume: State.settings.soundVolume,
       paused: State.paused,
-      dancing: desktopDances(State.spotifyPlaying, State.effectiveState),
     };
     const key = JSON.stringify(snapshot);
     if (key === this.pushed) return;

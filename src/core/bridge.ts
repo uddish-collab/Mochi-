@@ -7,7 +7,6 @@ import { emitTo, listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import type { Settings } from "./state";
 import type { RecapHistory, RecapPrefs } from "../recap/summary";
-import type { SpotifyState } from "./spotify";
 
 export const IS_TAURI =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -211,19 +210,7 @@ export const Bridge = {
   /** Asleep, the cursor poll stops. */
   desktopSetAsleep: (asleep: boolean) => call<void>("desktop_mochi_set_asleep", { asleep }),
 
-  // ── Spotify (src-tauri/src/spotify.rs, Linux) ─────────────────────────────
-  /** Reads the player again (the card came on screen) and reports it. */
-  spotifyRefresh: () => call<SpotifyState | null>("spotify_refresh"),
-  /** True when Spotify took it. `value`: seconds for seek, 0/1 for shuffle and repeat, 0…100 for volume. */
-  spotifyControl: (action: SpotifyAction, value?: number) =>
-    call<boolean>("spotify_control", { action, value: value ?? null }),
-  /** Brings Spotify forward or starts it; without it, its download page. */
-  spotifyOpen: () => call<boolean>("spotify_open"),
-  /** Whether there is a Spotify to launch (Settings). */
-  spotifyInstalled: () => call<boolean>("spotify_installed"),
 };
-
-export type SpotifyAction = "playPause" | "next" | "previous" | "seek" | "shuffle" | "repeat" | "volume";
 
 export type ShortcutStatus =
   | "active" | "off" | "inUse" | "duplicate" | "invalid"

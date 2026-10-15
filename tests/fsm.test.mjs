@@ -58,20 +58,18 @@ test("the mouse wakes a hidden island, which stays while it is hovered", () => {
   assert.equal(fsm.state, "petit");
 });
 
-test("the compact island hides 60 s after the mouse leaves", () => {
+test("the compact island stays visible after the mouse leaves", () => {
   fsm.mouseEntered();
   fsm.mouseLeft();
-  seconds(59);
+  seconds(600);
   assert.equal(fsm.state, "petit");
-  seconds(1);
-  assert.equal(fsm.state, "hidden");
 });
 
-test("coming back before the 60 s are up cancels the hide", () => {
-  fsm.mouseEntered();
+test("the compact island stays visible after the expanded island folds", () => {
+  opened(0.05);
   fsm.mouseLeft();
-  seconds(59);
-  fsm.mouseEntered();
+  seconds(0.05);
+  assert.equal(fsm.state, "petit");
   seconds(600);
   assert.equal(fsm.state, "petit");
 });
@@ -121,11 +119,11 @@ test("the collapse delay is the configured one", () => {
   assert.equal(fsm.state, "petit");
 });
 
-test("reveal shows the compact island from hidden and hides it again after 60 s", () => {
+test("reveal shows the compact island and leaves it visible", () => {
   fsm.reveal();
   assert.equal(fsm.state, "petit");
-  seconds(60);
-  assert.equal(fsm.state, "hidden");
+  seconds(600);
+  assert.equal(fsm.state, "petit");
 });
 
 test("reveal leaves an island that is already showing alone", () => {
@@ -293,14 +291,13 @@ test("a folded card keeps the compact island on screen until it is answered", ()
   fsm.mouseLeft();
   seconds(600);
   assert.equal(fsm.state, "home");
-  // Answered: the usual timers again.
+  // Answered: the compact Mochi remains visible after it folds.
   fsm.pinned = false;
   fsm.mouseLeft();
   seconds(15);
   assert.equal(fsm.state, "petit");
-  fsm.mouseLeft();
-  seconds(60);
-  assert.equal(fsm.state, "hidden");
+  seconds(600);
+  assert.equal(fsm.state, "petit");
 });
 
 test("an unusable delay is ignored", () => {

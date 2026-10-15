@@ -64,10 +64,6 @@ mod win;
 #[cfg(windows)]
 use win::connect;
 
-#[cfg(target_os = "linux")]
-mod unix;
-#[cfg(target_os = "linux")]
-use unix::connect;
 
 /// What the command line says: `--agent <name>` and the event name.
 struct Args {
@@ -540,3 +536,4 @@ mod tests {
         assert_eq!(multi["coucou_diff_truncated"], serde_json::Value::Bool(true));
     }
 }
+

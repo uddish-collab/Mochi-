@@ -12,11 +12,7 @@ const outDir = join(root, "release");
 
 const { version } = JSON.parse(readFileSync(join(root, "src-tauri", "tauri.conf.json"), "utf8"));
 
-// What each platform ships: where Tauri puts it, how to recognise it, and the
-// names it is published under (the rolling name, when there is one, always
-// points at the latest release).
-const arch = process.arch === "arm64" ? "aarch64" : "x86_64";
-const debArch = process.arch === "arm64" ? "arm64" : "amd64";
+// Windows release packages.
 const PACKAGES = {
   win32: [
     {
@@ -29,15 +25,6 @@ const PACKAGES = {
       suffix: ".msi",
       names: [`Coucou-Windows-${version}.msi`, "Coucou-Windows.msi"],
     },
-  ],
-  linux: [
-    {
-      dir: "appimage",
-      suffix: ".AppImage",
-      names: [`Coucou-Linux-${version}-${arch}.AppImage`, `Coucou-Linux-${arch}.AppImage`],
-    },
-    { dir: "deb", suffix: ".deb", names: [`Coucou-Linux-${version}-${debArch}.deb`] },
-    { dir: "rpm", suffix: ".rpm", names: [`Coucou-Linux-${version}-${arch}.rpm`] },
   ],
 };
 
@@ -82,3 +69,5 @@ for (const f of written) {
   console.log(`  ${f}  (${mb} MB)`);
 }
 console.log();
+
+

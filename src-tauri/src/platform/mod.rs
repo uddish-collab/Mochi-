@@ -10,15 +10,6 @@ mod windows;
 #[cfg(windows)]
 pub use self::windows::*;
 
-#[cfg(target_os = "linux")]
-mod linux;
-#[cfg(target_os = "linux")]
-pub use self::linux::*;
-// "Open terminal" on Linux: the process tree from /proc, then KWin, EWMH, kitty.
-#[cfg(target_os = "linux")]
-mod linux_focus;
-#[cfg(target_os = "linux")]
-pub use self::linux_focus::{focus_session_window, process_ancestors, window_owners};
 
 /// Wall-clock time in the user's time zone, for log lines and backup names.
 pub struct LocalTime {
@@ -88,3 +79,4 @@ pub enum MouseShape {
     /// A disc, in window-logical pixels: Mochi's body.
     Disc { cx: f64, cy: f64, r: f64 },
 }
+

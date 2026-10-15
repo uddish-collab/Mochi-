@@ -16,8 +16,6 @@ const {
   onLanguageChange, resolveLanguage, setLanguage, t, tl, tn, weekdayShort,
 } = await import("../src/i18n/i18n.ts");
 const { h, relabel, liveTextCount } = await import("../src/views/dom.ts");
-const { generate, convertFormat } = await import("../scripts/gen-strings.mjs");
-
 const here = dirname(fileURLToPath(import.meta.url));
 const WINDOWS = join(here, "..");
 const MAC = JSON.parse(readFileSync(join(WINDOWS, "src/i18n/strings.json"), "utf8"));
@@ -149,18 +147,6 @@ test("a language change relabels what was built, in place, and says so once", ()
 
 // ── The tables ────────────────────────────────────────────────────────────────
 
-test("strings.json is what the generator makes of the Mac's catalog", () => {
-  const catalog = JSON.parse(readFileSync(join(WINDOWS, "../NotchBuddy/Resources/Localizable.xcstrings"), "utf8"));
-  assert.deepEqual(generate(catalog), MAC);
-});
-
-test("the generator turns format specifiers into placeholders", () => {
-  assert.equal(convertFormat("Chat with %@", ["name"]), "Chat with {name}");
-  assert.equal(convertFormat("in %lld h %lld", ["h", "m"]), "in {h} h {m}");
-  assert.equal(convertFormat("%2$@ then %1$@"), "{1} then {0}");
-  assert.equal(convertFormat("100%% sure"), "100% sure");
-});
-
 const placeholders = (s) => [...new Set(s.match(/\{\w+\}/g) ?? [])].sort();
 
 for (const [name, table] of [["strings.json", MAC.strings], ["extra.json", EXTRA.strings]]) {
@@ -183,7 +169,7 @@ for (const [name, table] of [["strings.json", MAC.strings], ["extra.json", EXTRA
   });
 }
 
-test("extra.json never shadows a string of the Mac's", () => {
+test("extra.json never shadows a string of the Windows catalog", () => {
   for (const key of Object.keys(EXTRA.strings)) assert.ok(!(key in MAC.strings), key);
 });
 

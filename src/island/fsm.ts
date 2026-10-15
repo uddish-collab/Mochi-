@@ -21,8 +21,6 @@ export class IslandStateMachine {
     this.homeDelay = seconds;
     if (this.state === "home" && this.homeCollapse != null) this.scheduleHomeCollapse();
   }
-  /** petit → hidden delay, seconds. */
-  petitToHiddenDelay = 60;
   /** coucou → petit once the greeting animation ends (no hover). */
   greetAutoCollapseDelay = 0.6;
   /** coucou → petit while the mouse hovers the greeting. */
@@ -50,7 +48,6 @@ export class IslandStateMachine {
 
   private homeDelay = 15;
   private byHover = false;
-  private petitHide: number | null = null;
   private homeCollapse: number | null = null;
   private greetCollapse: number | null = null;
 
@@ -74,7 +71,6 @@ export class IslandStateMachine {
         this.transition("petit");
         break;
       case "petit":
-        this.clear("petitHide");
         break;
       case "home":
         this.clear("homeCollapse");
@@ -90,7 +86,7 @@ export class IslandStateMachine {
       case "hidden":
         break;
       case "petit":
-        this.schedulePetitHide();
+        // Compact Mochi stays visible until an explicit hide action.
         break;
       case "home":
         this.scheduleHomeCollapse();
@@ -120,7 +116,6 @@ export class IslandStateMachine {
     if (this.state !== "hidden") return;
     this.cancelTimers();
     this.transition("petit");
-    this.schedulePetitHide();
   }
 
   /**
@@ -156,16 +151,6 @@ export class IslandStateMachine {
 
   // ── Timers ──────────────────────────────────────────────────────────────────
 
-  private schedulePetitHide() {
-    this.clear("petitHide");
-    // A card folded away while it waits for an answer keeps the compact island
-    // on screen, so it can be reopened (isHeldOpen on macOS).
-    if (this.pinned) return;
-    this.petitHide = window.setTimeout(() => {
-      this.petitHide = null;
-      if (this.state === "petit" && !this.pinned) this.transition("hidden");
-    }, this.petitToHiddenDelay * 1000);
-  }
 
   private scheduleHomeCollapse() {
     this.clear("homeCollapse");
@@ -191,7 +176,7 @@ export class IslandStateMachine {
     }, delay * 1000);
   }
 
-  private clear(which: "petitHide" | "homeCollapse" | "greetCollapse") {
+  private clear(which: "homeCollapse" | "greetCollapse") {
     const id = this[which];
     if (id != null) window.clearTimeout(id);
     this[which] = null;
@@ -199,7 +184,6 @@ export class IslandStateMachine {
   }
 
   cancelTimers() {
-    this.clear("petitHide");
     this.clear("homeCollapse");
     this.clear("greetCollapse");
   }

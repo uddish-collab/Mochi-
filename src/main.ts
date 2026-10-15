@@ -8,8 +8,6 @@ import { Island } from "./island/island";
 import { registerHookHandlers } from "./island/hooks";
 import { registerIntegrationHandlers, refreshConfigured } from "./island/integrations";
 import { registerShortcutHandlers } from "./island/shortcuts";
-import { applySpotify, registerSpotifyHandlers } from "./island/spotify";
-import { SPOTIFY_ID } from "./core/spotify";
 import { Recap } from "./recap/recap";
 import { onLanguageChange, resolveLanguage, setLanguage, systemLanguages } from "./i18n/i18n";
 import { VoiceAssistant } from "./core/voice"; // Use "../voice" if this file is in a subfolder
@@ -103,11 +101,6 @@ async function main() {
   registerHookHandlers(island);
   registerIntegrationHandlers(island);
   registerShortcutHandlers(island, () => setPaused(false));
-  registerSpotifyHandlers(island);
-  // Rust may have read Spotify before this page listened: ask once.
-  if (State.settings.activeIntegrations.includes(SPOTIFY_ID)) {
-    void Bridge.spotifyRefresh().then((s) => s && applySpotify(island, s));
-  }
 
   // Monday recap: app start (greeting over), an agent starting work, waking up.
   const checkRecap = () => void Recap.check(island);
