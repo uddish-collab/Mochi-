@@ -41,6 +41,7 @@ function errorText(err: unknown): string {
 }
 
 export function agentsSection(list: AgentHookStatus[] | null): HTMLElement {
+  list = list?.filter((agent) => agent.id === "gemini" || agent.id === "codex") ?? null;
   const blocks = h("div", { style: "display:flex;flex-direction:column;gap:14px" });
   if (!list || list.length === 0) {
     blocks.append(h("div", { class: "hint", text: TEXT.none }));

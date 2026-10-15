@@ -13,8 +13,12 @@ use serde_json::{json, Value};
 use tauri::AppHandle;
 
 use crate::settings::Settings;
-use crate::{claude, local_chat, openai_compat, secrets};
-
+use crate::{claude, local_chat, openai_compat};
+/// Gemini CLI uses the user's Google account session, not the Google AI API.
+pub const GEMINI_ACCOUNT: &str = "gemini_account";
+pub const CLAUDE_ACCOUNT: &str = "claude_account";
+pub const CHATGPT_ACCOUNT: &str = "chatgpt_account";
+pub const CODEX_ACCOUNT: &str = "codex_account";
 pub const ANTHROPIC: &str = "anthropic";
 
 #[derive(Debug, Clone, Deserialize)]
@@ -30,13 +34,10 @@ pub struct ChatReply {
     pub text: String,
 }
 
-/// A model a provider offers, for the picker in the chat view.
+/// Kept for legacy provider modules that remain compiled for settings migration.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ModelInfo {
-    pub id: String,
-    pub label: String,
-}
+pub struct ModelInfo { pub id: String, pub label: String }
 
 // ── Conversation ──────────────────────────────────────────────────────────────
 
@@ -155,23 +156,6 @@ pub fn plain_question(first: bool, context: Option<&ChatContext>, query: &str) -
     }
 }
 
-// ── Which provider ────────────────────────────────────────────────────────────
-
-/// The model chosen for `provider`, or its default.
-pub fn model_for(settings: &Settings, provider: &str) -> String {
-    if provider == ANTHROPIC {
-        let m = settings.model.trim();
-        return if m.is_empty() { claude::DEFAULT_MODEL.to_string() } else { m.to_string() };
-    }
-    settings
-        .chat_models
-        .get(provider)
-        .map(|m| m.trim().to_string())
-        .filter(|m| !m.is_empty())
-        .or_else(|| openai_compat::provider(provider).map(|p| p.default_model.to_string()))
-        .unwrap_or_default()
-}
-
 /// A file rides along only if it is one of Coucou's own copies of a dropped
 /// file (files.rs puts them in the inbox). The page names the path, so without
 /// this any file the user can read could be sent to a chat provider.
@@ -196,6 +180,17 @@ fn is_inside(dir: &std::path::Path, path: &std::path::Path) -> bool {
         && std::fs::symlink_metadata(&file).map(|m| m.is_file()).unwrap_or(false)
 }
 
+/// Legacy model helper retained for dormant API provider code; account chat
+/// dispatch below never calls it.
+pub fn model_for(settings: &Settings, provider: &str) -> String {
+    if provider == ANTHROPIC {
+        let m = settings.model.trim();
+        return if m.is_empty() { claude::DEFAULT_MODEL.to_string() } else { m.to_string() };
+    }
+    settings.chat_models.get(provider).map(|m| m.trim().to_string()).filter(|m| !m.is_empty())
+        .or_else(|| openai_compat::provider(provider).map(|p| p.default_model.to_string())).unwrap_or_default()
+}
+
 /// One chat turn with the provider chosen in the settings.
 pub async fn send(
     app: &AppHandle,
@@ -206,36 +201,92 @@ pub async fn send(
 ) -> Result<ChatReply, String> {
     let context = context.map(checked_context).transpose()?;
     let provider = settings.chat_provider.as_str();
-    let model = model_for(settings, provider);
-    if provider == ANTHROPIC || provider.is_empty() {
-        return claude::send(chat, &model, query, context).await;
+    if matches!(provider, GEMINI_ACCOUNT | CLAUDE_ACCOUNT | CHATGPT_ACCOUNT | CODEX_ACCOUNT) {
+        return account_cli::send(chat, provider, query, context).await;
     }
-    if let Some(p) = openai_compat::provider(provider) {
-        return openai_compat::send(chat, p, &model, query, context).await;
-    }
-    if let Some(server) = local_chat::server(settings, provider) {
-        return local_chat::send(app, chat, &server, &model, query, context).await;
-    }
-    Err(format!("Unknown chat provider: {provider}"))
+    let _ = (app, settings, query, context);
+    Err(format!("No account chat is configured for provider: {provider}"))
 }
 
-/// The models `provider` offers. Asked only when the user opens the picker on
-/// that provider, and only once it has a key (or, for a local server, an
-/// address): nothing is sent anywhere before that.
-pub async fn models(settings: &Settings, provider: &str) -> Result<Vec<ModelInfo>, String> {
-    let no_key = || crate::i18n::t("No API key — add it in Settings.");
-    if provider == ANTHROPIC {
-        let key = secrets::get(claude::KEY).ok_or_else(no_key)?;
-        return claude::models(&key).await;
+mod account_cli {
+    use super::*;
+    use std::process::Command;
+
+    pub async fn send(chat: &Chat, provider: &str, query: String, context: Option<ChatContext>) -> Result<ChatReply, String> {
+        let turn = chat.begin(provider);
+        let question = plain_question(turn.first, context.as_ref(), &query);
+        let mut prompt = format!("{}\n\n", system_prompt(false));
+        for message in &turn.history {
+            let role = message["role"].as_str().unwrap_or("assistant");
+            let content = message["content"].as_str().unwrap_or("");
+            prompt.push_str(&format!("{role}: {content}\n\n"));
+        }
+        prompt.push_str(&format!("user: {question}\n\nassistant:"));
+        // Keep below Windows' 32,767-character process command-line limit.
+        if prompt.encode_utf16().count() > 24_000 {
+            return Err("This conversation is too long. Start a new chat and try again.".into());
+        }
+
+        let provider = provider.to_string();
+        let result = tauri::async_runtime::spawn_blocking(move || {
+            let (program, args) = cli_args(&provider, &prompt);
+            let mut command = Command::new(program);
+            command.args(args);
+            // Force the CLIs to use their signed-in account sessions, even if
+            // an old API key happens to be present in the parent environment.
+            for key in ["GEMINI_API_KEY", "GOOGLE_API_KEY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY", "CODEX_API_KEY"] {
+                command.env_remove(key);
+            }
+            let work = crate::settings::local_dir().join(format!("chat-{provider}"));
+            std::fs::create_dir_all(&work).map_err(|e| format!("Could not prepare Gemini chat: {e}"))?;
+            command.current_dir(work);
+            #[cfg(windows)]
+            crate::platform::no_console(&mut command);
+            let output = command.output().map_err(|e| {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    format!("{} is not installed. Install its official CLI and sign in with your account.", cli_name(&provider))
+                } else { format!("Could not start {}: {e}", cli_name(&provider)) }
+            })?;
+            if !output.status.success() {
+                let detail = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                return Err(if detail.is_empty() { format!("{} could not answer. Open its account sign-in and try again.", cli_name(&provider)) } else { detail });
+            }
+            parse_answer(&provider, &output.stdout)
+        }).await.map_err(|e| format!("Gemini chat failed: {e}"))??;
+
+        chat.commit(&turn, json!({"role":"user","content":question}), json!({"role":"assistant","content":result}), &question, &result);
+        Ok(ChatReply { text: result })
     }
-    if let Some(p) = openai_compat::provider(provider) {
-        let key = secrets::get(p.key).ok_or_else(no_key)?;
-        return openai_compat::models(p, &key).await;
+
+    fn cli_name(provider: &str) -> &'static str {
+        match provider { GEMINI_ACCOUNT => "Gemini CLI", CLAUDE_ACCOUNT => "Claude Code", CHATGPT_ACCOUNT | CODEX_ACCOUNT => "Codex CLI", _ => "AI CLI" }
     }
-    if let Some(server) = local_chat::server(settings, provider) {
-        return local_chat::models(&server).await;
+
+    fn cli_args(provider: &str, prompt: &str) -> (std::path::PathBuf, Vec<String>) {
+        let (name, args) = match provider {
+            GEMINI_ACCOUNT => ("gemini", vec!["-p".into(), prompt.into(), "--output-format".into(), "json".into(), "--approval-mode".into(), "plan".into()]),
+            CLAUDE_ACCOUNT => ("claude", vec!["-p".into(), prompt.into(), "--output-format".into(), "json".into(), "--permission-mode".into(), "plan".into(), "--tools".into(), "".into()]),
+            CHATGPT_ACCOUNT | CODEX_ACCOUNT => ("codex", vec!["exec".into(), "--json".into(), "--ephemeral".into(), "--sandbox".into(), "read-only".into(), "--skip-git-repo-check".into(), prompt.into()]),
+            _ => unreachable!("provider was checked before dispatch"),
+        };
+        #[cfg(windows)]
+        if let Some(path) = crate::platform::find_on_path(name) { return (path, args); }
+        (std::path::PathBuf::from(if cfg!(windows) { format!("{name}.cmd") } else { name.into() }), args)
     }
-    Err(format!("Unknown chat provider: {provider}"))
+
+    fn parse_answer(provider: &str, output: &[u8]) -> Result<String, String> {
+        let text = String::from_utf8_lossy(output);
+        let answer = match provider {
+            GEMINI_ACCOUNT => serde_json::from_str::<Value>(&text).ok().and_then(|v| v["response"].as_str().map(str::to_owned)),
+            CLAUDE_ACCOUNT => serde_json::from_str::<Value>(&text).ok().and_then(|v| v["result"].as_str().map(str::to_owned)),
+            CHATGPT_ACCOUNT | CODEX_ACCOUNT => text.lines().filter_map(|line| serde_json::from_str::<Value>(line).ok())
+                .filter(|v| v["type"] == "item.completed" && v["item"]["type"] == "agent_message")
+                .filter_map(|v| v["item"]["text"].as_str().map(str::to_owned)).last(),
+            _ => None,
+        };
+        answer.filter(|a| !a.trim().is_empty()).ok_or_else(|| format!("{} returned no answer. Check its CLI version and signed-in account.", cli_name(provider)))
+    }
+
 }
 
 #[cfg(test)]

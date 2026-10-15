@@ -72,6 +72,11 @@ export async function refreshConfigured() {
       case "none":
         configured = true;
         break;
+      case "account":
+        configured = def.id === "integration_github"
+          ? (await Bridge.secretPresent("github-token")) ?? false
+          : true;
+        break;
     }
     const info = State.integrations[def.id] ?? { data: {}, error: null, loaded: false, configured: false };
     State.integrations[def.id] = { ...info, configured };

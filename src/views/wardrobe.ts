@@ -4,6 +4,7 @@
 
 import { h } from "./dom";
 import { State } from "../core/state";
+import { pillDefinition } from "../core/pills";
 import { drawWardrobeIcon } from "../mochi/outfits";
 import {
   OUTFIT_KEYS, OUTFIT_SELECTIONS, WARDROBE_STRINGS, parseOutfit, resolveOutfit, seasonalOutfit,
@@ -16,6 +17,7 @@ const ICON = 28;
 
 export function buildWardrobe(actions: ViewActions): ViewHost {
   const note = h("span", { class: "wardrobe-note" });
+  const target = h("span", { class: "wardrobe-note" });
   const grid = h("div", { class: "wardrobe-grid" });
   const el = h(
     "div",
@@ -26,7 +28,7 @@ export function buildWardrobe(actions: ViewActions): ViewHost {
       h(
         "div",
         { class: "stack wardrobe-stack" },
-        h("div", { class: "wardrobe-head" }, h("span", { class: "wardrobe-title", text: tl("Wardrobe") }), note),
+        h("div", { class: "wardrobe-head" }, h("span", { class: "wardrobe-title", text: tl("Wardrobe") }), target, note),
         grid,
       ),
     ),
@@ -38,7 +40,7 @@ export function buildWardrobe(actions: ViewActions): ViewHost {
   const items = new Map<OutfitSelection, { button: HTMLButtonElement; canvas: HTMLCanvasElement }>();
 
   const updateNote = () => {
-    note.textContent = wardrobeHeader(hovered, parseOutfit(State.settings.mochiOutfit), new Date());
+    note.textContent = wardrobeHeader(hovered, parseOutfit(State.focusedMochiOutfit), new Date());
   };
 
   for (const sel of OUTFIT_SELECTIONS) {
@@ -87,9 +89,11 @@ export function buildWardrobe(actions: ViewActions): ViewHost {
     el,
     sync() {
       drawIcons();
+      const id = State.focusedMochiId;
+      target.textContent = `For ${State.focusTask?.name ?? pillDefinition(id)?.name ?? "Mochi"}`;
       // The island drops the preview when the view closes: so does the hover.
       if (State.wardrobePreview == null) hovered = null;
-      const current = parseOutfit(State.settings.mochiOutfit);
+      const current = parseOutfit(State.focusedMochiOutfit);
       for (const [sel, { button }] of items) button.classList.toggle("on", sel === current);
       updateNote();
     },

@@ -7,7 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   BODY_RADIUS_FRACTION, DesktopMochiController, PANEL_SIZE, RETRACT_DELAY_MS, RETURN_DELAY_MS,
-  agentActive, alertActive, gaze, isOverBody, layerDragTopLeft, lookOrigin, pointerDistance,
+  agentActive, alertActive, desktopBodyColor, gaze, isOverBody, layerDragTopLeft, lookOrigin, pointerDistance,
   shouldRetractOnLanding, shouldSleep, windowDragTopLeft,
 } from "../src/mochi/desktop-logic.ts";
 
@@ -28,6 +28,13 @@ test("agent work keeps him awake, idle and sleeping don't", () => {
   }
   assert.equal(agentActive("idle"), false);
   assert.equal(agentActive("sleeping"), false);
+});
+
+test("desktop Mochi keeps the selected provider color, with VS Code neutral", () => {
+  assert.equal(desktopBodyColor("agent_gemini", "#4285F4"), "#4285F4");
+  assert.equal(desktopBodyColor("integration_chatgpt", "#10A37F"), "#10A37F");
+  assert.equal(desktopBodyColor("integration_vscode", "#007ACC"), null);
+  assert.equal(desktopBodyColor(null, "#D97757"), null);
 });
 
 test("pointer distance: measured with a cursor poll, remembered without one", () => {

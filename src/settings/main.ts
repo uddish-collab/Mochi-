@@ -461,7 +461,6 @@ function activePillsSection(connected: Record<string, boolean>): HTMLElement {
     main.value = settings.mainPill;
     clear(groups);
     for (const cat of PILL_CATEGORIES) {
-      if (cat.id === "service") continue;
       const pills = availablePills().filter((p) => p.category === cat.id);
       if (pills.length === 0) continue;
       groups.append(h("div", { class: "pill-group" }, h("h3", { text: t(cat.title) }), ...pills.map(row)));
@@ -757,9 +756,6 @@ interface IntegrationDef {
 const INTEGRATIONS: IntegrationDef[] = [
   { id: "integration_stripe", name: "Stripe", color: "#0570DE",
     fields: [{ key: "stripe-api-key", label: N_("Secret key"), placeholder: "sk_live_…", secret: true }] },
-  { id: "integration_github", name: "GitHub", color: "#F4505E",
-    fields: [{ key: "github-token", label: N_("Token"), placeholder: "ghp_…", secret: true }],
-    hint: N_("Classic token with the repo scope, or fine-grained with read access to Pull requests, Commit statuses and Actions.") },
   { id: "integration_vercel", name: "Vercel", color: "#7C5CFF",
     fields: [{ key: "vercel-token", label: N_("Token"), placeholder: "…", secret: true }] },
   { id: "integration_n8n", name: "n8n", color: "#F29B38",
@@ -1310,37 +1306,11 @@ async function render() {
   };
   const agents = await Bridge.agentHooksList();
 
-  const hasKey = (await Bridge.secretPresent("anthropic-api-key")) ?? false;
   const shortcutReport = await Bridge.shortcutsStatus();
-
-  const keys = [
-    "stripe-api-key", "github-token", "vercel-token",
-    "n8n-url", "n8n-api-key", "resend-api-key", "notion-api-key", "calcom-api-key",
-  ];
-  const present: Record<string, boolean> = {};
-  for (const k of keys) present[k] = (await Bridge.secretPresent(k)) ?? false;
 
   // A main pill this build can run, and no pill declared twice.
   settings = { ...settings, ...sanitizeDeclared(settings) };
   const connected: Record<string, boolean> = { ...((await Bridge.agentHooksStatus()) ?? {}) };
-  for (const def of availablePills()) {
-    if (def.connect.kind === "key") {
-      connected[def.id] = present[def.connect.key] ?? (await Bridge.secretPresent(def.connect.key)) ?? false;
-    }
-  }
-  /** A chat provider's key was saved or removed: its pill's row says so at once. */
-  const keyChanged = (key: string, on: boolean) => {
-    for (const def of availablePills()) {
-      if (def.connect.kind === "key" && def.connect.key === key) connected[def.id] = on;
-    }
-    for (const redraw of declaredViews) redraw();
-  };
-  const chatKeys: Record<string, boolean> = {};
-  for (const def of CLOUD) {
-    const key = providerDef(def.id).key!;
-    chatKeys[key] = (await Bridge.secretPresent(key)) ?? false;
-  }
-  const customKey = (await Bridge.secretPresent(CUSTOM_SERVER_KEY)) ?? false;
 
   declaredViews.length = 0;
   localRedraw = null;
@@ -1351,11 +1321,7 @@ async function render() {
     claudeSection(status),
     agentsSection(agents),
     planSection(status),
-    apiSection(hasKey),
-    chatProvidersSection(chatKeys, keyChanged),
-    localSection(customKey),
     activePillsSection(connected),
-    integrationsSection(present),
     generalSection(),
     shortcutsSection(shortcutReport),
     h("div", {
@@ -1364,5 +1330,12 @@ async function render() {
     }),
   );
 }
+
+// Kept temporarily for migration compatibility with older settings data. The
+// account hub no longer exposes API-key or service-token entry forms.
+void apiSection;
+void chatProvidersSection;
+void localSection;
+void integrationsSection;
 
 void main();

@@ -8,7 +8,7 @@ import type { BotEmoteName } from "../core/layout";
 import { Sound } from "../core/sound";
 import { State } from "../core/state";
 import {
-  DESKTOP_EVENTS, DesktopMochiController, alertActive, type DesktopSnapshot,
+  DESKTOP_EVENTS, DesktopMochiController, alertActive, desktopBodyColor, type DesktopSnapshot,
 } from "../mochi/desktop-logic";
 import { SeasonCache, parseOutfit } from "../mochi/wardrobe";
 
@@ -166,7 +166,8 @@ export class DesktopLink {
   private push() {
     const snapshot: DesktopSnapshot = {
       state: State.effectiveState,
-      outfit: State.wardrobePreview ?? this.seasons.get(parseOutfit(State.settings.mochiOutfit)),
+      bodyColor: desktopBodyColor(State.focusTask?.id, State.focusTask?.color),
+      outfit: State.wardrobePreview ?? this.seasons.get(parseOutfit(State.focusedMochiOutfit)),
       soundEnabled: State.settings.soundEnabled,
       soundVolume: State.settings.soundVolume,
       paused: State.paused,

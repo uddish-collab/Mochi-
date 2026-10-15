@@ -107,6 +107,8 @@ export interface Settings {
   activeIntegrations: string[];
   /** The always-on workspace pill: VS Code, Cursor, Codex or Antigravity. */
   mainPill: string;
+  /** One-time migration marker for the account-hub default pill change. */
+  accountHubVersion: number;
   /** "primary", "cursor", or `at:<x>,<y>` for one display (logical origin). */
   screen: string;
   autostart: boolean;
@@ -134,6 +136,8 @@ export interface Settings {
    * Same raw values as the Mac's "mochiOutfit"; read it through parseOutfit.
    */
   mochiOutfit: string;
+  /** Outfit selection per focused Mochi/pill. Missing entries use mochiOutfit. */
+  mochiOutfits: Record<string, string>;
   /**
    * A colour of the user's own for a pill's Mochi, by pill ID ("#RRGGBB").
    * Empty means the catalog's colours; read it through core/pill-colors.ts.
@@ -159,9 +163,10 @@ export const DEFAULT_SETTINGS: Settings = {
   openOnHover: false,
   absenceInterval: 180,
   activeIntegrations: [
-    "integration_resend", "integration_n8n", "integration_vercel", "integration_github",
+    "agent_gemini", "integration_chatgpt", "agent_codex",
   ],
   mainPill: DEFAULT_MAIN_PILL,
+  accountHubVersion: 1,
   screen: "primary",
   autostart: false,
   hooksInstalled: false,
@@ -169,13 +174,14 @@ export const DEFAULT_SETTINGS: Settings = {
   showPlanInNotch: false,
   planRelayInstalled: false,
   showCodexPlanInNotch: false,
-  chatProvider: "anthropic",
+  chatProvider: "gemini_account",
   chatModels: {},
   ollamaUrl: "",
   lmstudioUrl: "",
   customUrl: "",
   shortcuts: {},
   mochiOutfit: DEFAULT_OUTFIT,
+  mochiOutfits: {},
   pillColors: {},
   language: "",
 };
@@ -373,6 +379,15 @@ class AppState {
     return sanitizeDeclared(this.settings, this.os).mainPill;
   }
 
+  /** The wardrobe belongs to the currently selected Mochi, not the whole app. */
+  get focusedMochiId(): string {
+    return this.focusId ?? this.mainPillId;
+  }
+
+  get focusedMochiOutfit(): string {
+    return this.settings.mochiOutfits[this.focusedMochiId] ?? this.settings.mochiOutfit;
+  }
+
   /**
    * True for a pill that stays when its session ends: the main pill and the
    * declared ones go back to idle instead of going away.
@@ -441,6 +456,7 @@ class AppState {
    * catalog agent wears its catalog colour, as on macOS.
    */
   upsertExternalAgent(id: string, name: string, color: string) {
+    if (!availablePills(this.os).some((p) => p.id === id)) return;
     if (this.tasks.some((t) => t.id === id)) return;
     const def = pillDefinition(id);
     this.insertAfterMain({
@@ -456,6 +472,7 @@ class AppState {
    * upsertWorkspaceTask does on macOS.
    */
   upsertWorkspacePill(id: string, name: string, cwd: string): AgentTask | null {
+    if (!availablePills(this.os).some((p) => p.id === id)) return null;
     let t = this.tasks.find((x) => x.id === id);
     if (!t) {
       const def = pillDefinition(id);

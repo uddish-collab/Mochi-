@@ -42,7 +42,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_autostart::{ManagerExt, MacosLauncher};
 
-use chat::{Chat, ChatContext, ChatReply, ModelInfo};
+use chat::{Chat, ChatContext, ChatReply};
 use files::DroppedFile;
 use hooks::{HookPreview, HookStatus};
 use island::{PollGate, ScreenInfo};
@@ -465,12 +465,46 @@ async fn chat_send(
     chat::send(&app, &chat, &settings, query, context).await
 }
 
-/// The models a provider offers, for the picker in the chat view. Only asked
-/// once the user picked that provider, and only with its key or address.
+/// Opens the provider's official CLI so the user can switch its signed-in account.
 #[tauri::command]
-async fn chat_models(shared: State<'_, Shared>, provider: String) -> Result<Vec<ModelInfo>, String> {
-    let settings = shared.settings.lock().unwrap().clone();
-    chat::models(&settings, &provider).await
+fn account_auth(provider: String) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let binary = match provider.as_str() {
+            "gemini_account" => "gemini",
+            // `&` runs the login flow even when there was no previous account
+            // to log out (cmd.exe's `&&` would stop at that first failure).
+            "claude_account" => "claude auth logout & claude auth login",
+            "chatgpt_account" | "codex_account" => "codex logout & codex",
+            "github" => "gh auth login",
+            "github_switch" => "gh auth switch",
+            _ => return Err("This account is connected through its own desktop app or browser.".into()),
+        };
+        let executable = match provider.as_str() {
+            "gemini_account" => "gemini",
+            "claude_account" => "claude",
+            "chatgpt_account" | "codex_account" => "codex",
+            "github" | "github_switch" => "gh",
+            _ => unreachable!(),
+        };
+        if platform::find_on_path(executable).is_none() {
+            return Err(format!("{executable} is not installed. Install the official CLI before connecting this account."));
+        }
+        let mut command = Command::new("cmd.exe");
+        command.args(["/K", binary]);
+        command.creation_flags(0x00000010); // CREATE_NEW_CONSOLE
+        for key in ["GEMINI_API_KEY", "GOOGLE_API_KEY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY", "CODEX_API_KEY"] {
+            command.env_remove(key);
+        }
+        command.spawn().map(|_| ()).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                format!("{} is not installed. Install the official CLI first.", binary)
+            } else { format!("Could not open {binary}: {e}") }
+        })
+    }
+    #[cfg(not(windows))]
+    { let _ = provider; Err("Account switching from Mochi is currently supported on Windows only.".into()) }
 }
 
 /// Settings → Local models → Connect: does the server answer, and with which models?
@@ -500,6 +534,9 @@ fn ingest_file(path: String) -> Result<DroppedFile, String> {
 /// The island may only ask whether a key exists — never read it.
 #[tauri::command]
 fn secret_present(key: String) -> bool {
+    if key == "github-token" {
+        return integrations::github_token().is_some();
+    }
     secrets::present(&key)
 }
 
@@ -646,6 +683,9 @@ fn open_settings_window(app: AppHandle) {
 
 pub fn run() {
     platform::prepare_environment();
+    // The user selected account-only integrations; discard credentials from
+    // the former API-key setup before any integration pollers are started.
+    secrets::clear_legacy_credentials();
     let loaded = settings::load();
     i18n::set_picked(&loaded.language);
     let gate = Arc::new(PollGate::new());
@@ -708,7 +748,7 @@ pub fn run() {
             approval_decline,
             log_line,
             chat_send,
-            chat_models,
+            account_auth,
             local_connect,
             local_set_key,
             chat_reset,

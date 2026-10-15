@@ -23,6 +23,9 @@ pub struct Settings {
     pub active_integrations: Vec<String>,
     /// The always-on workspace pill (src/core/pills.ts checks it is one).
     pub main_pill: String,
+    /// Versioned one-time migration for the default workspace pill.
+    #[serde(default = "legacy_account_hub_version")]
+    pub account_hub_version: u8,
     /// "primary" = the main display, "cursor" = whichever display the mouse is on.
     pub screen: String,
     /// Always true: Mochi starts with the computer.
@@ -58,6 +61,8 @@ pub autostart: bool,
     /// season), "none" or an outfit id — the Mac's raw values. The island reads
     /// anything it doesn't know as "auto", so the value is stored as it comes.
     pub mochi_outfit: String,
+    /// Outfit selection per focused Mochi/pill; empty entries use mochi_outfit.
+    pub mochi_outfits: BTreeMap<String, String>,
     /// A colour of the user's own for a pill's Mochi, by pill ID ("#RRGGBB"),
     /// picked in Settings → Active pills. Empty means the catalog's colours.
     /// Kept as it comes, like `mochi_outfit`: src/core/pill-colors.ts reads
@@ -93,6 +98,8 @@ fn default_model() -> String {
     crate::claude::DEFAULT_MODEL.to_string()
 }
 
+fn legacy_account_hub_version() -> u8 { 0 }
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
@@ -102,12 +109,12 @@ impl Default for Settings {
             open_on_hover: false,
             absence_interval: 180.0,
             active_integrations: vec![
-                "integration_resend".into(),
-                "integration_n8n".into(),
-                "integration_vercel".into(),
-                "integration_github".into(),
+                "agent_gemini".into(),
+                "integration_chatgpt".into(),
+                "agent_codex".into(),
             ],
-            main_pill: "integration_claude".into(),
+            main_pill: "integration_vscode".into(),
+            account_hub_version: 1,
             screen: "primary".into(),
             autostart: true,
             hooks_installed: false,
@@ -115,13 +122,14 @@ impl Default for Settings {
             show_plan_in_notch: false,
             plan_relay_installed: false,
             show_codex_plan_in_notch: false,
-            chat_provider: crate::chat::ANTHROPIC.into(),
+            chat_provider: crate::chat::GEMINI_ACCOUNT.into(),
             chat_models: BTreeMap::new(),
             ollama_url: String::new(),
             lmstudio_url: String::new(),
             custom_url: String::new(),
             shortcuts: Default::default(),
             mochi_outfit: "auto".into(),
+            mochi_outfits: BTreeMap::new(),
             pill_colors: BTreeMap::new(),
             language: String::new(),
             desktop_mochi: DesktopMochiPref::default(),
@@ -387,6 +395,7 @@ mod tests {
   "absenceInterval": 60.0,
   "activeIntegrations": ["integration_notion"],
   "mainPill": "agent_cursor",
+  "accountHubVersion": 1,
   "screen": "cursor",
   "autostart": true,
   "hooksInstalled": true,
@@ -394,13 +403,14 @@ mod tests {
   "showPlanInNotch": true,
   "planRelayInstalled": true,
   "showCodexPlanInNotch": true,
-  "chatProvider": "ollama",
+  "chatProvider": "gemini_account",
   "chatModels": { "ollama": "llama3.2", "openai": "gpt-x" },
   "ollamaUrl": "http://127.0.0.1:11434",
   "lmstudioUrl": "http://127.0.0.1:1234",
   "customUrl": "https://llm.example.com",
   "shortcuts": { "openChat": { "keys": "Ctrl+Shift+K", "enabled": false } },
   "mochiOutfit": "witchHat",
+  "mochiOutfits": { "agent_gemini": "bow" },
   "pillColors": { "integration_claude": "#2DD4BF" },
   "language": "pt-BR",
   "desktopMochi": { "onDesktop": true, "spot": { "x": 1500.5, "y": -300.0, "space": "screen" } }
@@ -561,6 +571,10 @@ mod tests {
                 .unwrap_or_else(|| panic!("a file without {key} was thrown away"));
             let mut expected = custom();
             expected[key] = defaults()[key].clone();
+            if key == "accountHubVersion" {
+                // Absence marks a pre-migration settings file.
+                expected[key] = json!(0);
+            }
             assert_eq!(shown(&loaded), expected, "without {key}");
         }
     }
@@ -790,6 +804,7 @@ mod tests {
                 "absenceInterval",
                 "activeIntegrations",
                 "mainPill",
+                "accountHubVersion",
                 "screen",
                 "autostart",
                 "hooksInstalled",
@@ -804,6 +819,7 @@ mod tests {
                 "customUrl",
                 "shortcuts",
                 "mochiOutfit",
+                "mochiOutfits",
                 "pillColors",
                 "language",
                 "desktopMochi",

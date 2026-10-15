@@ -6,7 +6,8 @@ import type { Settings } from "./state";
 import { N_ } from "../i18n/i18n";
 
 export type ProviderId =
-  | "anthropic" | "openai" | "google" | "openrouter"
+  | "anthropic" | "openai" | "google" | "gemini_account" | "claude_account"
+  | "chatgpt_account" | "codex_account" | "openrouter"
   | "ollama" | "lmstudio" | "custom";
 
 export interface ProviderDef {

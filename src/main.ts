@@ -10,7 +10,7 @@ import { registerIntegrationHandlers, refreshConfigured } from "./island/integra
 import { registerShortcutHandlers } from "./island/shortcuts";
 import { Recap } from "./recap/recap";
 import { onLanguageChange, resolveLanguage, setLanguage, systemLanguages } from "./i18n/i18n";
-import { VoiceAssistant } from "./core/voice"; // Use "../voice" if this file is in a subfolder
+import { VoiceAssistant } from "./core/voice";
 
 new VoiceAssistant().start();
 
@@ -31,6 +31,20 @@ async function main() {
   if (boot) {
     State.settings = { ...State.settings, ...boot.settings };
   }
+  // Move the shipped Claude default to the user's requested VS Code Mochi once.
+  // The marker lets them choose a different main pill later without being reset.
+  if (boot && (boot.settings.accountHubVersion ?? 0) < 1) {
+    if (boot.settings.mainPill === "integration_claude") {
+      State.settings.mainPill = "integration_vscode";
+    }
+    State.settings.accountHubVersion = 1;
+  }
+  // Discard retired API-backed chat selections; account CLIs are the only chat
+  // choices exposed by this build.
+  const accountChats = new Set(["gemini_account", "claude_account", "chatgpt_account", "codex_account"]);
+  if (!accountChats.has(State.settings.chatProvider)) {
+    State.settings = { ...State.settings, chatProvider: "gemini_account" };
+  }
   // A language change redraws the island in place: the texts given as tl(…)
   // relabel themselves (views/dom.ts) and the views redraw the rest on this
   // sync. Nothing is rebuilt, so tasks, steps and the chat stay as they are.
@@ -40,6 +54,15 @@ async function main() {
   void Bridge.setSystemLanguages(systemLanguages());
   island.applySettings();
   State.loadIntegrationTasks();
+  if (boot && (
+    boot.settings.mainPill !== State.settings.mainPill ||
+    boot.settings.accountHubVersion !== State.settings.accountHubVersion ||
+    JSON.stringify(boot.settings.activeIntegrations) !== JSON.stringify(State.settings.activeIntegrations) ||
+    boot.settings.chatProvider !== State.settings.chatProvider
+  )) {
+    // Persist the account-hub migration before Rust starts the integration pollers.
+    void Bridge.saveSettings(State.settings);
+  }
   if (boot && !boot.cursorPoll) island.followPageCursor();
   await island.desktop.init();
 

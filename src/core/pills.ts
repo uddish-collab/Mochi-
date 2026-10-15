@@ -23,6 +23,8 @@ export type PillConnect =
   | { kind: "key"; key: string }
   /** A model server the chat is connected to (Settings → Local models). */
   | { kind: "server"; field: "ollamaUrl" | "lmstudioUrl" }
+  /** An account-backed website or installed desktop tool. */
+  | { kind: "account"; url: string }
   /** Nothing to set up. */
   | { kind: "none" };
 
@@ -55,18 +57,22 @@ const ACCENT = {
 
 export const PILL_CATALOG: readonly PillDefinition[] = [
   // ── Where you code ─────────────────────────────────────────────────────────
-  { id: "integration_claude", name: "VS Code", color: "#F5F6F8", category: "workspace",
+  { id: "integration_claude", name: "Claude", color: "#D97757", category: "workspace",
     subtitle: N_("Integration"), source: "claudeCode", support: "yes", connect: hooks },
+  { id: "integration_vscode", name: "VS Code", color: "#007ACC", category: "workspace",
+    subtitle: N_("Workspace"), source: "agent", support: "yes", connect: { kind: "account", url: "https://code.visualstudio.com/" } },
+  { id: "integration_chatgpt", name: "ChatGPT", color: "#10A37F", category: "agent",
+    subtitle: N_("Account"), source: "agent", support: "yes", connect: { kind: "account", url: "https://chatgpt.com/" } },
   // Claude Code in Cursor's terminal: the same hooks as Claude Code.
   { id: "agent_cursor", name: "Cursor", color: "#C0C4CC", category: "workspace",
     subtitle: N_("Integration"), source: "agent", support: "yes", connect: hooks },
   { id: "agent_antigravity", name: "Antigravity", color: "#E879F9", category: "workspace",
     subtitle: N_("Integration"), source: "agent", support: "yes", connect: hooks },
-  { id: "agent_codex", name: "Codex", color: "#2DD4BF", category: "workspace",
-    subtitle: N_("Integration"), source: "agent", support: "yes", connect: hooks },
+  { id: "agent_codex", name: "Codex", color: "#2DD4BF", category: "agent",
+    subtitle: N_("Chat"), source: "agent", support: "yes", connect: { kind: "account", url: "https://chatgpt.com/codex/" } },
   // ── Agents ─────────────────────────────────────────────────────────────────
-  { id: "agent_gemini", name: "Gemini CLI", color: "#8AB4F8", category: "agent",
-    subtitle: N_("Agent"), source: "agent", support: "yes", connect: hooks },
+  { id: "agent_gemini", name: "Gemini", color: "#8AB4F8", category: "agent",
+    subtitle: N_("Chat"), source: "agent", support: "yes", connect: { kind: "account", url: "https://gemini.google.com/" } },
   { id: "agent_copilot", name: "Copilot CLI", color: "#818CF8", category: "agent",
     subtitle: N_("Agent"), source: "agent", support: "yes", connect: hooks },
   { id: "agent_muse", name: "Muse Code", color: "#38BDF8", category: "agent",
@@ -102,7 +108,7 @@ export const PILL_CATALOG: readonly PillDefinition[] = [
   { id: "integration_vercel", name: "Vercel", color: "#7C5CFF", category: "service",
     subtitle: N_("Integration"), source: "n8n", support: "yes", connect: key("vercel-token") },
   { id: "integration_github", name: "GitHub", color: "#F4505E", category: "service",
-    subtitle: N_("Integration"), source: "n8n", support: "yes", connect: key("github-token") },
+    subtitle: N_("Account"), source: "n8n", support: "yes", connect: { kind: "account", url: "https://github.com/" } },
   { id: "integration_notion", name: "Notion", color: "#8C8C8C", category: "service",
     subtitle: N_("Integration"), source: "n8n", support: "yes", connect: key("notion-api-key") },
   { id: "integration_calcom", name: "Cal.com", color: "#C9956A", category: "service",
@@ -112,10 +118,10 @@ export const PILL_CATALOG: readonly PillDefinition[] = [
 ];
 
 /** The always-on pill unless the user picks another workspace tool. */
-export const DEFAULT_MAIN_PILL = "integration_claude";
+export const DEFAULT_MAIN_PILL = "integration_vscode";
 
 /** How many declared pills may sit next to the main one. */
-export const MAX_DECLARED = 4;
+export const MAX_DECLARED = 5;
 
 /** The OS this page runs on. Only the Windows webview says "Windows". */
 export const HOST_OS: HostOs = "windows";
@@ -130,7 +136,11 @@ function offeredOn(def: PillDefinition, os: HostOs): boolean {
 
 /** The pills this build offers, in catalog order. */
 export function availablePills(os: HostOs = HOST_OS): PillDefinition[] {
-  return PILL_CATALOG.filter((p) => offeredOn(p, os));
+  const accountHub = new Set([
+    "integration_claude", "agent_gemini", "integration_chatgpt", "agent_codex",
+    "integration_vscode", "integration_github",
+  ]);
+  return PILL_CATALOG.filter((p) => accountHub.has(p.id) && offeredOn(p, os));
 }
 
 export function isComingSoon(id: string): boolean {
@@ -174,11 +184,18 @@ export function sanitizeDeclared(d: Declared, os: HostOs = HOST_OS): Declared {
   const mains = new Set(mainPillChoices(os).map((p) => p.id));
   const mainPill = mains.has(d.mainPill) ? d.mainPill : DEFAULT_MAIN_PILL;
   const offered = new Set(availablePills(os).map((p) => p.id));
+  const hasRetiredPills = (d.activeIntegrations ?? []).some((id) => !offered.has(id));
   const activeIntegrations: string[] = [];
   for (const id of d.activeIntegrations ?? []) {
     if (id !== mainPill && offered.has(id) && !activeIntegrations.includes(id)) {
       activeIntegrations.push(id);
     }
+  }
+  // A previous version stored only service pills, which this account hub no
+  // longer offers. Migrate that old default set to today's four Mochis once.
+  if (hasRetiredPills) {
+    activeIntegrations.splice(0, activeIntegrations.length,
+      "agent_gemini", "integration_chatgpt", "agent_codex");
   }
   return { mainPill, activeIntegrations };
 }

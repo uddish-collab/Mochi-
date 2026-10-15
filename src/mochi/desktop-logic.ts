@@ -13,12 +13,19 @@ import type { Outfit } from "./wardrobe";
 /** What the island tells the desktop window, whenever it changes. */
 export interface DesktopSnapshot {
   state: BotStateName;
+  /** Selected provider identity; VS Code keeps the neutral white Mochi. */
+  bodyColor: string | null;
   /** He is always the main Mochi, so always dressed (try-ons included). */
   outfit: Outfit;
   soundEnabled: boolean;
   soundVolume: number;
   /** Tray → Pause: he dozes off and stays asleep. */
   paused: boolean;
+}
+
+/** Keep provider identity when the Mochi leaves the island. */
+export function desktopBodyColor(pillId: string | null | undefined, color: string | null | undefined): string | null {
+  return pillId && pillId !== "integration_vscode" ? color ?? null : null;
 }
 
 /** Events between the two windows. Rust adds `desktop-mochi-dropped`. */

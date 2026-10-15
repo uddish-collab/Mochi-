@@ -392,6 +392,31 @@ export class Island {
       setFocus: (id) => {
         State.setFocus(id);
         Sound.play("blip");
+        const accountChats: Record<string, string> = {
+          agent_gemini: "gemini_account",
+          integration_claude: "claude_account",
+          integration_chatgpt: "chatgpt_account",
+          agent_codex: "codex_account",
+        };
+        const chatProvider = accountChats[id];
+        if (chatProvider) {
+          State.settings = { ...State.settings, chatProvider: chatProvider as typeof State.settings.chatProvider };
+          void Bridge.saveSettings(State.settings);
+          this.setView("prompt");
+          return;
+        }
+        if (id === "integration_vscode") {
+          void Bridge.openInVSCode(null);
+          return;
+        }
+        if (id === "integration_github" && !State.integrations.integration_github?.configured) {
+          void Bridge.accountAuth("github").catch((err) => {
+            State.noteMessage = String(err).replace(/^Error:\s*/, "");
+            State.view = "note";
+            State.notify();
+          });
+          return;
+        }
         const req = State.pendingApproval;
         if (req?.pillId === id) this.setView(req.questions ? "question" : "approval");
       },
@@ -456,8 +481,9 @@ export class Island {
       openSettingsWindow: () => void Bridge.openSettingsWindow(),
       blip: () => Sound.play("blip"),
       chooseOutfit: (selection) => {
-        if (parseOutfit(State.settings.mochiOutfit) === selection) return;
-        State.settings.mochiOutfit = selection;
+        const mochiId = State.focusedMochiId;
+        if (parseOutfit(State.focusedMochiOutfit) === selection) return;
+        State.settings.mochiOutfits = { ...State.settings.mochiOutfits, [mochiId]: selection };
         void Bridge.saveSettings(State.settings);
         Sound.play("pop");
         this.engine.triggerEmote("proud");
@@ -1275,7 +1301,7 @@ export class Island {
     const focus = State.focusTask;
     this.engine.bodyColor = planCardOpen()
       ? hexToRGB(openPlanColor())
-      : focus?.isIntegration
+      : focus?.isIntegration && focus.id !== "integration_vscode"
         ? hexToRGB(focus.color)
         : null;
     this.engine.particleOverhang = BOT_OVERHANG;
@@ -1291,10 +1317,8 @@ export class Island {
       }
     }
     const inWardrobe = State.mode === "expanded" && State.view === "wardrobe";
-    const mainFocused = State.focusId == null || State.focusId === State.mainPillId;
-    const showOutfit = mainFocused || State.mode !== "expanded" || inWardrobe;
-    const outfit = State.wardrobePreview ?? this.seasons.get(parseOutfit(State.settings.mochiOutfit));
-    this.engine.setOutfit(showOutfit ? outfit : "none", !inWardrobe);
+    const outfit = State.wardrobePreview ?? this.seasons.get(parseOutfit(State.focusedMochiOutfit));
+    this.engine.setOutfit(outfit, !inWardrobe);
     this.engine.update(dt);
     ctx.setTransform(dpr, 0, 0, dpr, BOT_SIDE * dpr, 0);
     ctx.clearRect(-BOT_SIDE, 0, wCss, hCss);

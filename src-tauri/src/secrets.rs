@@ -53,3 +53,11 @@ pub fn clear(key: &str) -> Result<(), String> {
 pub fn present(key: &str) -> bool {
     get(key).is_some()
 }
+
+/// Remove credentials saved by the old API-key/service-token setup. Account
+/// integrations now use provider-owned sign-in sessions instead.
+pub fn clear_legacy_credentials() {
+    for key in KNOWN_KEYS {
+        let _ = clear(key);
+    }
+}

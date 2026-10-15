@@ -53,6 +53,10 @@ const OPEN_URLS: Record<string, string> = {
   integration_resend: "https://resend.com/emails",
   integration_vercel: "https://vercel.com/dashboard",
   integration_github: "https://github.com",
+  integration_chatgpt: "https://chatgpt.com/",
+  agent_gemini: "https://gemini.google.com/",
+  agent_codex: "https://chatgpt.com/codex/",
+  integration_vscode: "https://code.visualstudio.com/",
   integration_stripe: "https://dashboard.stripe.com/payments",
   integration_notion: "https://notion.so",
   integration_calcom: "https://app.cal.com/bookings",
@@ -70,9 +74,16 @@ export function idleStatus(
   const def = pillDefinition(id);
   const ok = (label: string) => ({ label, color: "#22C55E" });
   const missing = (label: string) => ({ label, color: "#F4505E" });
+  if (["agent_gemini", "integration_chatgpt", "agent_codex"].includes(id)) {
+    return ok(t("Chat available in Mochi"));
+  }
   // Pills driven by hooks never have a key: they are connected once the hooks
   // are in place (Mac #183). A session replaces this card; nothing is loading.
   if (def?.connect.kind === "hooks") return configured ? ok(t("Hooks installed")) : missing(t("Hooks not installed"));
+  if (def?.connect.kind === "account") {
+    if (id === "integration_github" && !configured) return missing(t("Sign in with GitHub CLI to load your activity"));
+    return ok(t("Open your account in the browser"));
+  }
   if (def?.connect.kind === "none") return ok(t("Ready · no setup needed"));
   if (def?.connect.kind === "server") return configured ? ok(t("Connected")) : missing(t("Not connected"));
   if (def?.category === "ai") {
@@ -89,8 +100,37 @@ function idleCard(task: AgentTask, openSettings: () => void): HTMLElement {
   const status = idleStatus(task.id, info, State.settings.model);
 
   const actions = h("div", { class: "int-actions" });
-  if (task.id === "integration_claude") {
+  if (def?.connect.kind === "account" && OPEN_URLS[task.id]) {
     actions.append(
+      h("button", {
+        class: "link-btn",
+        style: `color:${task.color}d9`,
+        text: t("Open {name}", { name: task.name }),
+        onclick: () => task.id === "integration_vscode"
+          ? void Bridge.openInVSCode(null)
+          : void Bridge.openUrl(OPEN_URLS[task.id]),
+      }),
+    );
+    if (task.id === "integration_github") {
+      actions.append(h("button", {
+        class: "link-btn",
+        style: `color:${task.color}b3`,
+        text: configured ? t("Sign in / switch account") : t("Sign in with GitHub CLI"),
+        onclick: () => void Bridge.accountAuth(configured ? "github_switch" : "github").catch((err) => {
+          State.noteMessage = String(err).replace(/^Error:\s*/, "");
+          State.view = "note";
+          State.notify();
+        }),
+      }));
+    }
+  } else if (task.id === "integration_claude") {
+    actions.append(
+      h("button", {
+        class: "link-btn",
+        style: `color:${task.color}d9`,
+        text: t("Open Claude"),
+        onclick: () => void Bridge.openUrl("https://claude.ai/"),
+      }),
       h("button", {
         class: "link-btn",
         style: `color:${task.color}b3`,

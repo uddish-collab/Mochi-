@@ -138,15 +138,12 @@ export const Bridge = {
   approvalDecline: (requestId: string) => call<void>("approval_decline", { requestId }),
 
   // ── Chat, files, secrets ──────────────────────────────────────────────────
-  /** One chat turn. The API key and any file bytes never leave Rust. */
+  /** One account-backed chat turn. */
   chatSend: (query: string, context: ChatContext | null) =>
     callOrThrow<{ text: string }>("chat_send", { query, context }),
+  /** Opens the account provider's official CLI for account switching. */
+  accountAuth: (provider: string) => callOrThrow<void>("account_auth", { provider }),
   chatReset: () => call<void>("chat_reset"),
-  /**
-   * The models a provider offers, for the picker in the chat view. Rust asks
-   * the provider only when it has a key (or a server address).
-   */
-  chatModels: (provider: string) => callOrThrow<ModelInfo[]>("chat_models", { provider }),
   /** Settings → Local models → Connect: does the server answer, and with which models? */
   /** The custom server's key, bound to the address it is entered for. */
   localSetKey: (url: string, key: string) => call<void>("local_set_key", { url, key }),
@@ -258,11 +255,6 @@ export interface IntegrationUpdate {
 export type ChatContext =
   | { kind: "file"; name: string; path: string }
   | { kind: "window"; appName: string; title: string; url?: string };
-
-export interface ModelInfo {
-  id: string;
-  label: string;
-}
 
 export interface LocalServer {
   /** The address as it is stored. */

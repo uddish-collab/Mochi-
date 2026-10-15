@@ -11,6 +11,7 @@
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
+use std::process::Command;
 
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -52,6 +53,31 @@ fn client() -> reqwest::Client {
         .timeout(TIMEOUT)
         .build()
         .unwrap_or_default()
+}
+
+/// Prefer an explicitly saved token; otherwise reuse the user's existing GitHub
+/// CLI login. `gh auth token` reads its own credential store and prints only to
+/// this process; Mochi never persists or exposes the token to the webview.
+pub fn github_token() -> Option<String> {
+    if let Some(token) = secrets::get("github-token") {
+        return Some(token);
+    }
+    #[cfg(windows)]
+    let mut command = {
+        let path = crate::platform::find_on_path("gh")?;
+        Command::new(path)
+    };
+    #[cfg(not(windows))]
+    let mut command = Command::new("gh");
+    command.args(["auth", "token"]);
+    #[cfg(windows)]
+    crate::platform::no_console(&mut command);
+    let output = command.output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let token = String::from_utf8(output.stdout).ok()?.trim().to_string();
+    (!token.is_empty()).then_some(token)
 }
 
 /// Set from the tray's Pause item. While it is on, nothing reaches the network:
@@ -274,7 +300,7 @@ async fn poll_stripe(app: AppHandle) {
 // ── GitHub ────────────────────────────────────────────────────────────────────
 
 async fn poll_github(app: AppHandle) {
-    let Some(token) = secrets::get("github-token") else { return };
+    let Some(token) = github_token() else { return };
     let http = client();
 
     let user = http
@@ -451,7 +477,7 @@ async fn run_github_pulse(app: &AppHandle) -> bool {
     if PAUSED.load(Ordering::Relaxed) || !enabled(app, GITHUB_ID) {
         return false;
     }
-    let Some(token) = secrets::get("github-token") else { return false };
+    let Some(token) = github_token() else { return false };
     let generation = GITHUB.generation.load(Ordering::SeqCst);
     GITHUB.pulse_busy.store(true, Ordering::SeqCst);
     let root = github_graphql(&token, github::PULSE_QUERY, "pulse").await;
@@ -480,7 +506,7 @@ async fn run_github_activity(app: &AppHandle) {
     if PAUSED.load(Ordering::Relaxed) || !enabled(app, GITHUB_ID) {
         return;
     }
-    let Some(token) = secrets::get("github-token") else { return };
+    let Some(token) = github_token() else { return };
     let generation = GITHUB.generation.load(Ordering::SeqCst);
     GITHUB.activity_busy.store(true, Ordering::SeqCst);
     let root = github_graphql(&token, github::ACTIVITY_QUERY, "activity").await;
@@ -529,7 +555,7 @@ pub fn github_refresh_if_stale(section: &str) {
 /// its requests still in flight, and fetch again right away.
 pub fn github_token_changed(app: &AppHandle) {
     GITHUB.generation.fetch_add(1, Ordering::SeqCst);
-    let has_token = secrets::get("github-token").is_some();
+    let has_token = github_token().is_some();
     {
         let mut cache = GITHUB.cache.lock().unwrap();
         cache.pulse = None;
