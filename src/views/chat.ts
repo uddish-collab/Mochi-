@@ -71,9 +71,9 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
   const name = h("span", { class: "model-name", text: "Gemini" });
   const switchAccount = h("button", {
   class: "icon-btn",
-  title: "Sign in / switch account",
+  title: "Sign in / Switch",
   });
-  switchAccount.setAttribute("aria-label", "Sign in / switch account");
+  switchAccount.setAttribute("aria-label", "Sign in / Switch");
   switchAccount.innerHTML = `
   <svg viewBox="0 0 24 24" width="16" height="16" fill="none"
        stroke="currentColor" stroke-width="1.8"
