@@ -57,8 +57,7 @@ const ACCENT = {
 
 export const PILL_CATALOG: readonly PillDefinition[] = [
   // ── Where you code ─────────────────────────────────────────────────────────
-  { id: "integration_claude", name: "Claude", color: "#D97757", category: "workspace",
-    subtitle: N_("Integration"), source: "claudeCode", support: "yes", connect: hooks },
+  
   { id: "integration_vscode", name: "VS Code", color: "#007ACC", category: "workspace",
     subtitle: N_("Workspace"), source: "agent", support: "yes", connect: { kind: "account", url: "https://code.visualstudio.com/" } },
   { id: "integration_chatgpt", name: "ChatGPT", color: "#10A37F", category: "agent",
@@ -68,8 +67,6 @@ export const PILL_CATALOG: readonly PillDefinition[] = [
     subtitle: N_("Integration"), source: "agent", support: "yes", connect: hooks },
   { id: "agent_antigravity", name: "Antigravity", color: "#E879F9", category: "workspace",
     subtitle: N_("Integration"), source: "agent", support: "yes", connect: hooks },
-  { id: "agent_codex", name: "Codex", color: "#2DD4BF", category: "agent",
-    subtitle: N_("Chat"), source: "agent", support: "yes", connect: { kind: "account", url: "https://chatgpt.com/codex/" } },
   // ── Agents ─────────────────────────────────────────────────────────────────
   { id: "agent_gemini", name: "Gemini", color: "#8AB4F8", category: "agent",
     subtitle: N_("Chat"), source: "agent", support: "yes", connect: { kind: "account", url: "https://gemini.google.com/" } },
@@ -136,8 +133,8 @@ function offeredOn(def: PillDefinition, os: HostOs): boolean {
 
 /** The pills this build offers, in catalog order. */
 export function availablePills(os: HostOs = HOST_OS): PillDefinition[] {
-  const accountHub = new Set([
-    "integration_claude", "agent_gemini", "integration_chatgpt", "agent_codex",
+    const accountHub = new Set([
+    "agent_gemini", "integration_chatgpt",
     "integration_vscode", "integration_github",
   ]);
   return PILL_CATALOG.filter((p) => accountHub.has(p.id) && offeredOn(p, os));
@@ -160,9 +157,7 @@ export function mainPillChoices(os: HostOs = HOST_OS): PillDefinition[] {
 /** PillDefinition.sessionSubtitle — next to the name in a live session's card. */
 export function sessionSubtitle(id: string): string {
   switch (id) {
-    case "integration_claude": return "Claude Code";
     case "agent_cursor": return "Cursor";
-    case "agent_codex": return "Codex";
     case "agent_hermes": return "Hermes";
     case "agent_claude-desktop": return "Claude Desktop";
     default: return N_("Agent");
@@ -194,8 +189,8 @@ export function sanitizeDeclared(d: Declared, os: HostOs = HOST_OS): Declared {
   // A previous version stored only service pills, which this account hub no
   // longer offers. Migrate that old default set to today's four Mochis once.
   if (hasRetiredPills) {
-    activeIntegrations.splice(0, activeIntegrations.length,
-      "agent_gemini", "integration_chatgpt", "agent_codex");
+        activeIntegrations.splice(0, activeIntegrations.length,
+      "agent_gemini", "integration_chatgpt");
   }
   return { mainPill, activeIntegrations };
 }
