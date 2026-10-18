@@ -115,7 +115,7 @@ function idleCard(task: AgentTask, openSettings: () => void): HTMLElement {
       actions.append(h("button", {
         class: "link-btn",
         style: `color:${task.color}b3`,
-        text: configured ? t("Sign in / switch account") : t("Sign in with GitHub CLI"),
+        text: configured ? t("Sign in / Switch") : t("Sign in with GitHub CLI"),
         onclick: () => void Bridge.accountAuth(configured ? "github_switch" : "github").catch((err) => {
           State.noteMessage = String(err).replace(/^Error:\s*/, "");
           State.view = "note";

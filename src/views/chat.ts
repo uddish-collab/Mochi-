@@ -69,7 +69,18 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
   const input = h("input", { type: "text", class: "chat-input", placeholder: t(STRINGS.placeholderFirst), spellcheck: "false" }) as HTMLInputElement;
   const send = h("button", { class: "send-btn", title: tl(STRINGS.send) }, svg(ICONS.arrowUp, 11));
   const name = h("span", { class: "model-name", text: "Gemini" });
-  const switchAccount = h("button", { class: "picker-link", text: "Sign in / switch account" });
+  const switchAccount = h("button", {
+  class: "icon-btn",
+  title: "Sign in / switch account",
+  });
+  switchAccount.setAttribute("aria-label", "Sign in / switch account");
+  switchAccount.innerHTML = `
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none"
+       stroke="currentColor" stroke-width="1.8"
+       stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="8" r="3.5"/>
+    <path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/>
+  </svg>`;
   switchAccount.addEventListener("click", async () => {
     const provider = State.settings.chatProvider;
     try { await Bridge.accountAuth(provider); }
