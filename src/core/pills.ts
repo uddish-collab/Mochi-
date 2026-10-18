@@ -58,7 +58,7 @@ const ACCENT = {
 export const PILL_CATALOG: readonly PillDefinition[] = [
   // ── Where you code ─────────────────────────────────────────────────────────
   
-  { id: "integration_vscode", name: "VS Code", color: "#007ACC", category: "workspace",
+  { id: "integration_vscode", name: "VS Code", color: "#FFFFFF", category: "workspace",
     subtitle: N_("Workspace"), source: "agent", support: "yes", connect: { kind: "account", url: "https://code.visualstudio.com/" } },
   { id: "integration_chatgpt", name: "ChatGPT", color: "#10A37F", category: "agent",
     subtitle: N_("Account"), source: "agent", support: "yes", connect: { kind: "account", url: "https://chatgpt.com/" } },
@@ -68,7 +68,7 @@ export const PILL_CATALOG: readonly PillDefinition[] = [
   { id: "agent_antigravity", name: "Antigravity", color: "#E879F9", category: "workspace",
     subtitle: N_("Integration"), source: "agent", support: "yes", connect: hooks },
   // ── Agents ─────────────────────────────────────────────────────────────────
-  { id: "agent_gemini", name: "Gemini", color: "#8AB4F8", category: "agent",
+  { id: "agent_gemini", name: "Gemini", color: "#007ACC", category: "agent",
     subtitle: N_("Chat"), source: "agent", support: "yes", connect: { kind: "account", url: "https://gemini.google.com/" } },
   { id: "agent_copilot", name: "Copilot CLI", color: "#818CF8", category: "agent",
     subtitle: N_("Agent"), source: "agent", support: "yes", connect: hooks },
