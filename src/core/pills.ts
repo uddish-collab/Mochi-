@@ -182,15 +182,15 @@ export function sanitizeDeclared(d: Declared, os: HostOs = HOST_OS): Declared {
   const hasRetiredPills = (d.activeIntegrations ?? []).some((id) => !offered.has(id));
   const activeIntegrations: string[] = [];
   for (const id of d.activeIntegrations ?? []) {
-    if (id !== mainPill && offered.has(id) && !activeIntegrations.includes(id)) {
-      activeIntegrations.push(id);
+    if (offered.has(id) && !activeIntegrations.includes(id)) {
+            activeIntegrations.push(id);
     }
   }
   // A previous version stored only service pills, which this account hub no
   // longer offers. Migrate that old default set to today's four Mochis once.
   if (hasRetiredPills) {
-        activeIntegrations.splice(0, activeIntegrations.length,
-      "agent_gemini", "integration_chatgpt");
+            activeIntegrations.splice(0, activeIntegrations.length,
+      "agent_gemini", "integration_chatgpt", "integration_github", "integration_vscode");
   }
   return { mainPill, activeIntegrations };
 }
@@ -201,7 +201,7 @@ export function sanitizeDeclared(d: Declared, os: HostOs = HOST_OS): Declared {
  * declared, and a fifth pill never added.
  */
 export function toggleDeclared(d: Declared, id: string, os: HostOs = HOST_OS): string[] | null {
-  if (id === d.mainPill) return null;
+  
   if (!availablePills(os).some((p) => p.id === id)) return null;
   if (d.activeIntegrations.includes(id)) return d.activeIntegrations.filter((x) => x !== id);
   if (d.activeIntegrations.length >= MAX_DECLARED) return null;
@@ -214,7 +214,7 @@ export function toggleDeclared(d: Declared, id: string, os: HostOs = HOST_OS): s
  */
 export function chooseMainPill(d: Declared, id: string, os: HostOs = HOST_OS): Declared | null {
   if (!mainPillChoices(os).some((p) => p.id === id)) return null;
-  return { mainPill: id, activeIntegrations: d.activeIntegrations.filter((x) => x !== id) };
+    return { mainPill: id, activeIntegrations: d.activeIntegrations };
 }
 
 /**

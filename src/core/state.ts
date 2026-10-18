@@ -163,7 +163,7 @@ export const DEFAULT_SETTINGS: Settings = {
   openOnHover: false,
   absenceInterval: 180,
   activeIntegrations: [
-    "agent_gemini", "integration_chatgpt", "agent_codex",
+    "agent_gemini", "integration_chatgpt", "integration_github",
   ],
   mainPill: DEFAULT_MAIN_PILL,
   accountHubVersion: 1,

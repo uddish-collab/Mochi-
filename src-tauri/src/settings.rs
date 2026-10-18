@@ -111,7 +111,7 @@ impl Default for Settings {
             active_integrations: vec![
                 "agent_gemini".into(),
                 "integration_chatgpt".into(),
-                "agent_codex".into(),
+                "integration_github".into(),
             ],
             main_pill: "integration_vscode".into(),
             account_hub_version: 1,
