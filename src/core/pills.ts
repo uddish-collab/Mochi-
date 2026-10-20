@@ -60,8 +60,7 @@ export const PILL_CATALOG: readonly PillDefinition[] = [
   
   { id: "integration_vscode", name: "VS Code", color: "#FFFFFF", category: "workspace",
     subtitle: N_("Workspace"), source: "agent", support: "yes", connect: { kind: "account", url: "https://code.visualstudio.com/" } },
-  { id: "integration_chatgpt", name: "ChatGPT", color: "#10A37F", category: "agent",
-    subtitle: N_("Account"), source: "agent", support: "yes", connect: { kind: "account", url: "https://chatgpt.com/" } },
+  
   // Claude Code in Cursor's terminal: the same hooks as Claude Code.
   { id: "agent_cursor", name: "Cursor", color: "#C0C4CC", category: "workspace",
     subtitle: N_("Integration"), source: "agent", support: "yes", connect: hooks },
@@ -133,7 +132,7 @@ function offeredOn(def: PillDefinition, os: HostOs): boolean {
 /** The pills this build offers, in catalog order. */
 export function availablePills(os: HostOs = HOST_OS): PillDefinition[] {
     const accountHub = new Set([
-    "integration_chatgpt",
+    
     "integration_vscode", "integration_github",
   ]);
   return PILL_CATALOG.filter((p) => accountHub.has(p.id) && offeredOn(p, os));
@@ -189,7 +188,7 @@ export function sanitizeDeclared(d: Declared, os: HostOs = HOST_OS): Declared {
   // longer offers. Migrate that old default set to today's four Mochis once.
   if (hasRetiredPills) {
             activeIntegrations.splice(0, activeIntegrations.length,
-      "integration_chatgpt", "integration_github", "integration_vscode");  }
+            "integration_github", "integration_vscode");  }
   return { mainPill, activeIntegrations };
 }
 

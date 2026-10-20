@@ -476,7 +476,7 @@ fn account_auth(provider: String) -> Result<(), String> {
             // `&` runs the login flow even when there was no previous account
             // to log out (cmd.exe's `&&` would stop at that first failure).
             "claude_account" => "claude auth logout & claude auth login",
-            "chatgpt_account" | "codex_account" => "codex logout & codex",
+            
             "github" => "gh auth login",
             "github_switch" => "gh auth switch",
             _ => return Err("This account is connected through its own desktop app or browser.".into()),
@@ -484,7 +484,7 @@ fn account_auth(provider: String) -> Result<(), String> {
         let executable = match provider.as_str() {
             
             "claude_account" => "claude",
-            "chatgpt_account" | "codex_account" => "codex",
+            
             "github" | "github_switch" => "gh",
             _ => unreachable!(),
         };

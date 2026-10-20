@@ -90,8 +90,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
       State.notify();
     }
   });
-  const row = h("div", { class: "model-row" }, h("span", { class: "model-btn", style: "cursor:default" }, h("i", { class: "model-dot", style: "background:#4285f4" }), name), switchAccount);
-  const body = h("div", { class: "chat-body" }, chipRow, log, row, h("div", { class: "chat-bar" }, input, send));
+    const body = h("div", { class: "chat-body" }, chipRow, log, h("div", { class: "chat-bar" }, input, send));
   const el = h("div", { class: "view" }, h("div", { class: "card wash chat-card" }, body));
   (el.querySelector(".card") as HTMLElement).style.setProperty("--wash", "rgba(66,133,244,0.5)");
 
@@ -128,7 +127,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
       Sound.play("finish");
     } catch (err) {
       State.stateOverride = null;
-      State.noteMessage = `${String(err).replace(/^Error:\s*/, "")}\n\n${accountSetup(State.settings.chatProvider)}`;
+      State.noteMessage = "Our communication lines were just eaten by a Titan. Wall Rose is being repaired as we speak.";
       State.view = "note";
       Sound.play("error");
     } finally {

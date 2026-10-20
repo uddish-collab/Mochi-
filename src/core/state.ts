@@ -163,7 +163,7 @@ export const DEFAULT_SETTINGS: Settings = {
   openOnHover: false,
   absenceInterval: 180,
   activeIntegrations: [
-     "integration_chatgpt", "integration_github",
+      "integration_github",
   ],
   mainPill: DEFAULT_MAIN_PILL,
   accountHubVersion: 1,
@@ -174,7 +174,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showPlanInNotch: false,
   planRelayInstalled: false,
   showCodexPlanInNotch: false,
-  chatProvider: "chatgpt_account",
+  chatProvider: "anthropic",
   chatModels: {},
   ollamaUrl: "",
   lmstudioUrl: "",

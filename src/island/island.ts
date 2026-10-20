@@ -396,8 +396,7 @@ export class Island {
         const accountChats: Record<string, string> = {
           
           integration_claude: "claude_account",
-          integration_chatgpt: "chatgpt_account",
-          agent_codex: "codex_account",
+          
         };
         const chatProvider = accountChats[id];
         if (chatProvider) {

@@ -201,7 +201,7 @@ pub async fn send(
 ) -> Result<ChatReply, String> {
     let context = context.map(checked_context).transpose()?;
     let provider = settings.chat_provider.as_str();
-    if matches!(provider, GEMINI_ACCOUNT | CLAUDE_ACCOUNT | CHATGPT_ACCOUNT | CODEX_ACCOUNT) {
+        if matches!(provider, CLAUDE_ACCOUNT) {
         return account_cli::send(chat, provider, query, context).await;
     }
     let _ = (app, settings, query, context);
@@ -242,11 +242,24 @@ mod account_cli {
             command.current_dir(work);
             #[cfg(windows)]
             crate::platform::no_console(&mut command);
-            let output = command.output().map_err(|e| {
+                        let use_stdin = matches!(provider.as_str(), CHATGPT_ACCOUNT | CODEX_ACCOUNT);
+            if use_stdin {
+                command.stdin(std::process::Stdio::piped());
+            }
+            command.stdout(std::process::Stdio::piped());
+            command.stderr(std::process::Stdio::piped());
+            let mut child = command.spawn().map_err(|e| {
                 if e.kind() == std::io::ErrorKind::NotFound {
                     format!("{} is not installed. Install its official CLI and sign in with your account.", cli_name(&provider))
                 } else { format!("Could not start {}: {e}", cli_name(&provider)) }
             })?;
+            if use_stdin {
+                if let Some(mut stdin) = child.stdin.take() {
+                    use std::io::Write;
+                    let _ = stdin.write_all(prompt.as_bytes());
+                }
+            }
+            let output = child.wait_with_output().map_err(|e| format!("Could not read {}: {e}", cli_name(&provider)))?;
             if !output.status.success() {
                 let detail = String::from_utf8_lossy(&output.stderr).trim().to_string();
                 return Err(if detail.is_empty() { format!("{} could not answer. Open its account sign-in and try again.", cli_name(&provider)) } else { detail });
@@ -266,7 +279,7 @@ mod account_cli {
         let (name, args) = match provider {
             GEMINI_ACCOUNT => ("gemini", vec!["-p".into(), prompt.into(), "--output-format".into(), "json".into(), "--approval-mode".into(), "plan".into()]),
             CLAUDE_ACCOUNT => ("claude", vec!["-p".into(), prompt.into(), "--output-format".into(), "json".into(), "--permission-mode".into(), "plan".into(), "--tools".into(), "".into()]),
-            CHATGPT_ACCOUNT | CODEX_ACCOUNT => ("codex", vec!["exec".into(), "--json".into(), "--ephemeral".into(), "--sandbox".into(), "read-only".into(), "--skip-git-repo-check".into(), prompt.into()]),
+            CHATGPT_ACCOUNT | CODEX_ACCOUNT => ("codex", vec!["exec".into(), "--json".into(), "--ephemeral".into(), "--sandbox".into(), "read-only".into(), "--skip-git-repo-check".into(), "-".into()]),
             _ => unreachable!("provider was checked before dispatch"),
         };
         #[cfg(windows)]

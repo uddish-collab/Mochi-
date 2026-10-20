@@ -52,8 +52,6 @@ function arr(id: string, key: string): Record<string, unknown>[] {
 const OPEN_URLS: Record<string, string> = {
   
   integration_github: "https://github.com",
-  integration_chatgpt: "https://chatgpt.com/",
-  agent_codex: "https://chatgpt.com/codex/",
   integration_vscode: "https://code.visualstudio.com/",
   
 };
@@ -70,9 +68,7 @@ export function idleStatus(
   const def = pillDefinition(id);
   const ok = (label: string) => ({ label, color: "#22C55E" });
   const missing = (label: string) => ({ label, color: "#F4505E" });
-  if (["integration_chatgpt", "agent_codex"].includes(id)) {
-    return ok(t("Chat available in Mochi"));
-  }
+  
   // Pills driven by hooks never have a key: they are connected once the hooks
   // are in place (Mac #183). A session replaces this card; nothing is loading.
   if (def?.connect.kind === "hooks") return configured ? ok(t("Hooks installed")) : missing(t("Hooks not installed"));

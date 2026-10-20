@@ -364,7 +364,7 @@ function buildOverview(actions: ViewActions): ViewHost {
         }
       }
 
-            const simpleCard = mode === "card" && ["integration_vscode", "integration_chatgpt", "integration_github"].includes(task?.id ?? "");
+            const simpleCard = mode === "card" && ["integration_vscode",  "integration_github"].includes(task?.id ?? "");
       jump.style.display = detailOpen || mode === "plan" || mode === "diff" || simpleCard ? "none" : "";
 
       // Ctrl+↓ Ctrl+↑ walk the open GitHub list (cardItemCount / cardSelection).
@@ -689,16 +689,32 @@ function buildConfused(): ViewHost {
 // ── Note ──────────────────────────────────────────────────────────────────────
 
 function buildNote(): ViewHost {
-  const title = h("div", { class: "title" });
-  const el = h("div", { class: "view" }, card(null, h("div", { class: "stack", style: "padding:0 18px 0 98px" }, title)));
+  const title = h("div", { class: "title", style: "font-size:15px;font-weight:600;line-height:1.3;text-align:left" });
+  const sub = h("div", { style: "font-size:12.5px;opacity:0.7;line-height:1.35;text-align:left;display:none" });
+  const pill = h("div", {
+    style: "display:none;align-items:center;gap:7px;padding:3px 11px 3px 9px;border-radius:999px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.14);font-size:11px;font-weight:600;letter-spacing:0.02em",
+  },
+    h("i", { style: "width:7px;height:7px;border-radius:50%;background:#ef4444;box-shadow:0 0 8px 2px rgba(239,68,68,0.75);display:block" }),
+    h("span", { text: "Connection lost" }),
+  );
+  const titan = h("img", { src: "/titan.png", style: "display:none;height:110px;width:auto;object-fit:contain;flex-shrink:0" });
+  const left = h("div", { style: "flex:1;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:6px;min-width:0" }, pill, title, sub);
+  const el = h("div", { class: "view" }, card(null, h("div", {
+    style: "padding:0 14px 0 98px;display:flex;align-items:center;gap:12px;height:100%",
+  }, left, titan)));
   return {
     el,
     sync() {
-      title.textContent = State.noteMessage ?? "";
+      const message = State.noteMessage ?? "";
+      const isTitan = message.includes("Titan");
+      title.textContent = isTitan ? "A Titan ate our communication lines." : message;
+      sub.textContent = isTitan ? "Wall Rose is being repaired." : "";
+      sub.style.display = isTitan ? "block" : "none";
+      pill.style.display = isTitan ? "inline-flex" : "none";
+      titan.style.display = isTitan ? "block" : "none";
     },
   };
 }
-
 // ── In-island settings ────────────────────────────────────────────────────────
 
 function buildSettings(actions: ViewActions): ViewHost {
