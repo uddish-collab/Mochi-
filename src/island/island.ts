@@ -392,6 +392,10 @@ export class Island {
       setFocus: (id) => {
         State.setFocus(id);
         Sound.play("blip");
+                if (id === "agent_gemini") {
+          void Bridge.openGeminiWindow();
+          return;
+        }
         const accountChats: Record<string, string> = {
           agent_gemini: "gemini_account",
           integration_claude: "claude_account",
