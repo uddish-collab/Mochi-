@@ -68,8 +68,7 @@ export const PILL_CATALOG: readonly PillDefinition[] = [
   { id: "agent_antigravity", name: "Antigravity", color: "#E879F9", category: "workspace",
     subtitle: N_("Integration"), source: "agent", support: "yes", connect: hooks },
   // ── Agents ─────────────────────────────────────────────────────────────────
-  { id: "agent_gemini", name: "Gemini", color: "#007ACC", category: "agent",
-    subtitle: N_("Chat"), source: "agent", support: "yes", connect: { kind: "account", url: "https://gemini.google.com/" } },
+  
   { id: "agent_copilot", name: "Copilot CLI", color: "#818CF8", category: "agent",
     subtitle: N_("Agent"), source: "agent", support: "yes", connect: hooks },
   { id: "agent_muse", name: "Muse Code", color: "#38BDF8", category: "agent",
@@ -134,7 +133,7 @@ function offeredOn(def: PillDefinition, os: HostOs): boolean {
 /** The pills this build offers, in catalog order. */
 export function availablePills(os: HostOs = HOST_OS): PillDefinition[] {
     const accountHub = new Set([
-    "agent_gemini", "integration_chatgpt",
+    "integration_chatgpt",
     "integration_vscode", "integration_github",
   ]);
   return PILL_CATALOG.filter((p) => accountHub.has(p.id) && offeredOn(p, os));
@@ -190,8 +189,7 @@ export function sanitizeDeclared(d: Declared, os: HostOs = HOST_OS): Declared {
   // longer offers. Migrate that old default set to today's four Mochis once.
   if (hasRetiredPills) {
             activeIntegrations.splice(0, activeIntegrations.length,
-      "agent_gemini", "integration_chatgpt", "integration_github", "integration_vscode");
-  }
+      "integration_chatgpt", "integration_github", "integration_vscode");  }
   return { mainPill, activeIntegrations };
 }
 

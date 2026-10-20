@@ -472,7 +472,7 @@ fn account_auth(provider: String) -> Result<(), String> {
     {
         use std::os::windows::process::CommandExt;
         let binary = match provider.as_str() {
-            "gemini_account" => "gemini",
+            
             // `&` runs the login flow even when there was no previous account
             // to log out (cmd.exe's `&&` would stop at that first failure).
             "claude_account" => "claude auth logout & claude auth login",
@@ -482,7 +482,7 @@ fn account_auth(provider: String) -> Result<(), String> {
             _ => return Err("This account is connected through its own desktop app or browser.".into()),
         };
         let executable = match provider.as_str() {
-            "gemini_account" => "gemini",
+            
             "claude_account" => "claude",
             "chatgpt_account" | "codex_account" => "codex",
             "github" | "github_switch" => "gh",
@@ -665,45 +665,7 @@ fn create_settings_window(app: &AppHandle) {
         Err(err) => log::line(format!("settings window failed: {err}")),
     }
 }
-const GEMINI_URL: &str = "https://gemini.google.com/app";
 
-/// Gemini's website in its own window. Created hidden at launch like the
-/// settings window (a window made later comes up blank), shown on demand.
-fn create_gemini_window(app: &AppHandle) {
-    let Ok(url) = GEMINI_URL.parse::<tauri::Url>() else { return };
-    match WebviewWindowBuilder::new(app, "gemini", WebviewUrl::External(url))
-        .additional_browser_args(BROWSER_ARGS)
-        .title("Gemini")
-        .inner_size(460.0, 700.0)
-        .min_inner_size(360.0, 480.0)
-        .resizable(true)
-        .visible(false)
-        .center()
-        .build()
-    {
-        Ok(win) => {
-            let hidden = win.clone();
-            win.on_window_event(move |event| {
-                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                    api.prevent_close();
-                    let _ = hidden.hide();
-                }
-            });
-        }
-        Err(err) => log::line(format!("gemini window failed: {err}")),
-    }
-}
-
-#[tauri::command]
-fn open_gemini_window(app: AppHandle) {
-    let Some(win) = app.get_webview_window("gemini") else {
-        log::line("gemini window missing");
-        return;
-    };
-    let _ = win.unminimize();
-    let _ = win.show();
-    let _ = win.set_focus();
-}
 pub fn show_settings_window(app: &AppHandle) {
     let Some(win) = app.get_webview_window("settings") else {
         log::line("settings window missing");
@@ -797,8 +759,8 @@ pub fn run() {
             refresh_integration,
             github_refresh,
             open_n8n,
-            open_settings_window,
-            open_gemini_window,
+                        open_settings_window,
+            
             set_paused,
             shortcuts_status,
             shortcuts_suspend,
@@ -831,7 +793,7 @@ pub fn run() {
             tray::build(&handle)?;
             // Before the island: see create_settings_window.
             create_settings_window(&handle);
-                        create_gemini_window(&handle);
+                        
             // Same rule for Mochi's desktop window.
             desktop::setup(&handle);
 

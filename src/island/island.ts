@@ -392,12 +392,9 @@ export class Island {
       setFocus: (id) => {
         State.setFocus(id);
         Sound.play("blip");
-                if (id === "agent_gemini") {
-          void Bridge.openGeminiWindow();
-          return;
-        }
+                   
         const accountChats: Record<string, string> = {
-          agent_gemini: "gemini_account",
+          
           integration_claude: "claude_account",
           integration_chatgpt: "chatgpt_account",
           agent_codex: "codex_account",
@@ -666,7 +663,8 @@ export class Island {
     State.notify();
   }
 
-  setView(view: IslandViewName) {
+    setView(view: IslandViewName) {
+    
     this.stopSequenceIfLeaving(view);
     if (view !== "overview") closePlanCard();
     if (State.mode !== "expanded") {

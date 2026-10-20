@@ -364,7 +364,7 @@ function buildOverview(actions: ViewActions): ViewHost {
         }
       }
 
-            const simpleCard = mode === "card" && ["integration_vscode", "integration_chatgpt", "agent_gemini", "integration_github"].includes(task?.id ?? "");
+            const simpleCard = mode === "card" && ["integration_vscode", "integration_chatgpt", "integration_github"].includes(task?.id ?? "");
       jump.style.display = detailOpen || mode === "plan" || mode === "diff" || simpleCard ? "none" : "";
 
       // Ctrl+↓ Ctrl+↑ walk the open GitHub list (cardItemCount / cardSelection).

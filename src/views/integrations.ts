@@ -50,16 +50,12 @@ function arr(id: string, key: string): Record<string, unknown>[] {
 // ── Not configured / idle ─────────────────────────────────────────────────────
 
 const OPEN_URLS: Record<string, string> = {
-  integration_resend: "https://resend.com/emails",
-  integration_vercel: "https://vercel.com/dashboard",
+  
   integration_github: "https://github.com",
   integration_chatgpt: "https://chatgpt.com/",
-  agent_gemini: "https://gemini.google.com/",
   agent_codex: "https://chatgpt.com/codex/",
   integration_vscode: "https://code.visualstudio.com/",
-  integration_stripe: "https://dashboard.stripe.com/payments",
-  integration_notion: "https://notion.so",
-  integration_calcom: "https://app.cal.com/bookings",
+  
 };
 
 /** IntegrationCardView.statusLabel on macOS. */
@@ -74,7 +70,7 @@ export function idleStatus(
   const def = pillDefinition(id);
   const ok = (label: string) => ({ label, color: "#22C55E" });
   const missing = (label: string) => ({ label, color: "#F4505E" });
-  if (["agent_gemini", "integration_chatgpt", "agent_codex"].includes(id)) {
+  if (["integration_chatgpt", "agent_codex"].includes(id)) {
     return ok(t("Chat available in Mochi"));
   }
   // Pills driven by hooks never have a key: they are connected once the hooks
