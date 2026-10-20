@@ -131,6 +131,14 @@ async function main() {
   island.onWake = checkRecap;
   await onEvent<null>("recap-check", checkRecap);
 
+  // The greeting plays its sound the moment launch() starts. Let the sounds
+  // finish decoding first (they load alongside everything above, so this usually
+  // costs nothing); a hung load can hold the island back for 2.5 s at most.
+  await Promise.race([
+    Sound.preload().catch(() => {}),
+    new Promise<void>((resolve) => window.setTimeout(resolve, 2500)),
+  ]);
+
   island.launch();
 
   // In a plain browser there is no wake strip behind the cursor: make the whole

@@ -7,6 +7,12 @@
 
 import { Bridge } from "./bridge";
 
+/** Goes to the console and Mochi's own log, so a silent greeting can be traced. */
+const trace = (message: string) => {
+  console.info(`sound: ${message}`);
+  void Bridge.log(`sound: ${message}`);
+};
+
 export const SOUND_NAMES = [
   "peek", "open", "close", "hover", "blip", "slap", "annoyed", "dizzy", "greet",
   "work", "finish", "error", "approval", "question", "approve", "gulp", "tick",
@@ -29,20 +35,33 @@ class SoundEngine {
   customized = new Set<string>();
   /** Sounds still playing, by name, so one can be faded out (the greeting). */
   private playing = new Map<string, Set<{ src: AudioBufferSourceNode; gain: GainNode }>>();
+  /** True once the first decode pass is over, whether or not every file loaded. */
+  private ready = false;
+  /** Bumped by fadeOut(), so a play() still waiting for the decode is cancelled with it. */
+  private generation = new Map<string, number>();
+  /** Sounds already reported as undecodable, so the log isn't flooded. */
+  private missing = new Set<string>();
 
   /** Creates the context and decodes every WAV. Safe to call more than once. */
   preload(): Promise<void> {
     if (this.loading) return this.loading;
     this.loading = (async () => {
-      const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (!Ctor) return;
-      const ctx = new Ctor();
-      this.ctx = ctx;
-      const master = ctx.createGain();
-      master.gain.value = this.volume;
-      master.connect(ctx.destination);
-      this.master = master;
-      await this.loadAll(ctx);
+      try {
+        const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        if (!Ctor) return;
+        const ctx = new Ctor();
+        this.ctx = ctx;
+        const master = ctx.createGain();
+        master.gain.value = this.volume;
+        master.connect(ctx.destination);
+        this.master = master;
+        await this.loadAll(ctx);
+      } catch (err) {
+        // Never rejects: callers wait on this promise and sound is optional.
+        trace(`preload failed: ${String(err)}`);
+      } finally {
+        this.ready = true;
+      }
     })();
     return this.loading;
   }
@@ -119,14 +138,36 @@ class SoundEngine {
 
   play(name: SoundName | string) {
     if (!this.enabled) return;
+    // At launch the greeting asks for its sound before the 29 WAVs have been
+    // decoded, and skipping it silently is what made the startup sound vanish.
+    // Wait for the first decode pass and play it then, unless fadeOut() cancelled
+    // it in the meantime (the greeting was left early).
+    if (!this.ready && this.loading && !this.buffers.has(name)) {
+      const gen = this.generation.get(name) ?? 0;
+      void this.loading.then(() => {
+        if ((this.generation.get(name) ?? 0) === gen) this.play(name);
+      });
+      return;
+    }
+    this.start(name);
+  }
+
+  private start(name: string) {
     const ctx = this.ctx;
     const master = this.master;
     const buf = this.buffers.get(name);
-    if (!ctx || !master || !buf) return;
+    if (!ctx || !master || !buf) {
+      if (!this.missing.has(name)) {
+        this.missing.add(name);
+        trace(`${name} not played: no decoded sound`);
+      }
+      return;
+    }
     if (this.idleTimer != null) {
       window.clearTimeout(this.idleTimer);
       this.idleTimer = null;
     }
+    if (name === "greeting") trace(`greeting starts, audio context is ${ctx.state}`);
     if (ctx.state === "suspended") void ctx.resume();
     const src = ctx.createBufferSource();
     src.buffer = buf;
@@ -146,6 +187,8 @@ class SoundEngine {
 
   /** Fades every playing copy of `name` to silence over `seconds`, then stops it. */
   fadeOut(name: string, seconds: number) {
+    // Also cancels a play() of this name that is still waiting for the decode.
+    this.generation.set(name, (this.generation.get(name) ?? 0) + 1);
     const ctx = this.ctx;
     const voices = this.playing.get(name);
     if (!ctx || !voices) return;
