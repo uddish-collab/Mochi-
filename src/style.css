@@ -1313,6 +1313,24 @@ input[type="range"]::-webkit-slider-thumb {
   font: inherit;
   cursor: default;
 }
+.int-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  opacity: 0.8;
+  transition: background 0.15s, opacity 0.15s;
+}
+.int-icon:hover {
+  background: rgba(255, 255, 255, 0.14);
+  opacity: 1;
+}
 .icon-btn {
   display: inline-flex;
   align-items: center;

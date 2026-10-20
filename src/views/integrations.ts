@@ -12,7 +12,7 @@ import { isComingSoon, pillDefinition } from "../core/pills";
 import { refreshHookPills } from "../island/integrations";
 import { readActivity, readPulse, readStats } from "../core/github";
 import { githubDetail, githubPulseCard } from "./github";
-import { N_, language, t } from "../i18n/i18n";
+import { language, t } from "../i18n/i18n";
 
 /** Same shape as the Swift `timeAgo` computed properties. */
 export function timeAgo(value: unknown): string {
@@ -26,7 +26,7 @@ export function timeAgo(value: unknown): string {
 }
 
 function header(color: string, name: string, kind: string, extra?: Node): HTMLElement {
-  const row = h("div", { class: "int-head" }, dot(color, 7), h("b", { text: name }), h("span", { text: kind }));
+  const row = h("div", { class: "int-head" }, dot(color, 7), h("b", { text: name }), kind ? h("span", { text: kind }) : null);
   if (extra) row.append(extra);
   return row;
 }
@@ -93,111 +93,72 @@ export function idleStatus(
   return configured ? ok(t("Connected · loading…")) : missing(t("Key not configured"));
 }
 
-function idleCard(task: AgentTask, openSettings: () => void): HTMLElement {
+const ICON_OPEN = '<path d="M7 17 17 7"/><path d="M8 7h9v9"/>';
+const ICON_REFRESH = '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>';
+const ICON_USER = '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/>';
+
+function iconBtn(title: string, color: string, paths: string, onclick: () => void): HTMLElement {
+  const b = h("button", { class: "int-icon", title, onclick });
+  b.setAttribute("aria-label", title);
+  b.style.color = color;
+  b.innerHTML =
+    `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" ` +
+    `stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+  return b;
+}
+
+function idleCard(task: AgentTask, _openSettings: () => void): HTMLElement {
   const info = State.integrations[task.id];
   const configured = info?.configured ?? false;
   const def = pillDefinition(task.id);
   const status = idleStatus(task.id, info, State.settings.model);
 
   const actions = h("div", { class: "int-actions" });
-  if (def?.connect.kind === "account" && OPEN_URLS[task.id]) {
+
+  // Open: VS Code opens the app, everything else opens its website.
+  if (task.id === "integration_vscode" || OPEN_URLS[task.id]) {
     actions.append(
-      h("button", {
-        class: "link-btn",
-        style: `color:${task.color}d9`,
-        text: t("Open {name}", { name: task.name }),
-        onclick: () => task.id === "integration_vscode"
+      iconBtn(t("Open {name}", { name: task.name }), task.color, ICON_OPEN, () =>
+        task.id === "integration_vscode"
           ? void Bridge.openInVSCode(null)
-          : void Bridge.openUrl(OPEN_URLS[task.id]),
-      }),
-    );
-    if (task.id === "integration_github") {
-      actions.append(h("button", {
-        class: "link-btn",
-        style: `color:${task.color}b3`,
-        text: configured ? t("Sign in / Switch") : t("Sign in with GitHub CLI"),
-        onclick: () => void Bridge.accountAuth(configured ? "github_switch" : "github").catch((err) => {
-          State.noteMessage = String(err).replace(/^Error:\s*/, "");
-          State.view = "note";
-          State.notify();
-        }),
-      }));
-    }
-  } else if (task.id === "integration_claude") {
-    actions.append(
-      h("button", {
-        class: "link-btn",
-        style: `color:${task.color}d9`,
-        text: t("Open Claude"),
-        onclick: () => void Bridge.openUrl("https://claude.ai/"),
-      }),
-      h("button", {
-        class: "link-btn",
-        style: `color:${task.color}b3`,
-        text: t("Open Visual Studio Code"),
-        onclick: () => void Bridge.openInVSCode(task.sessionCwd ?? null),
-      }),
-    );
-  } else if (task.id === "agent_claude-desktop") {
-    actions.append(
-      h("button", {
-        class: "link-btn",
-        style: `color:${task.color}d9`,
-        text: t("Open Claude"),
-        onclick: () => void Bridge.openClaudeDesktop(),
-      }),
-    );
-  } else if (task.id === "integration_n8n") {
-    actions.append(
-      h("button", {
-        class: "link-btn",
-        style: `color:${task.color}d9`,
-        text: t("Open {name}", { name: "n8n" }),
-        onclick: () => void Bridge.openN8n(),
-      }),
-    );
-  } else if (OPEN_URLS[task.id]) {
-    actions.append(
-      h("button", {
-        class: "link-btn",
-        style: `color:${task.color}d9`,
-        text: t("Open {name}", { name: task.name }),
-        onclick: () => void Bridge.openUrl(OPEN_URLS[task.id]),
-      }),
+          : void Bridge.openUrl(OPEN_URLS[task.id])),
     );
   }
+
+  // GitHub: sign in or switch account.
+  if (task.id === "integration_github") {
+    actions.append(iconBtn(
+      configured ? t("Sign in / Switch") : t("Sign in with GitHub CLI"), task.color, ICON_USER,
+      () => void Bridge.accountAuth(configured ? "github_switch" : "github").catch((err) => {
+        State.noteMessage = String(err).replace(/^Error:\s*/, "");
+        State.view = "note";
+        State.notify();
+      })));
+  }
+
+  // Refresh, or Settings when something still has to be set up.
   const hookPill = def?.connect.kind === "hooks";
   if (isComingSoon(task.id) || def?.connect.kind === "none") {
     // Nothing to set up, and nothing to refresh.
   } else if (configured && (hookPill || def?.category !== "ai")) {
     actions.append(
-      h("button", {
-        class: "link-btn",
-        style: `color:${task.color}d9`,
-        text: t("Refresh"),
-        // A hook pill has nothing to poll: look at its hooks again instead.
-        onclick: () => void (hookPill ? refreshHookPills() : Bridge.refreshIntegration(task.id)),
-      }),
-    );
-  } else if (!configured) {
-    actions.append(
-      h("button", { class: "link-btn", style: "color:#8e939c", text: t("Settings…"), onclick: openSettings }),
+      iconBtn(t("Refresh"), task.color, ICON_REFRESH, () =>
+        void (hookPill ? refreshHookPills() : Bridge.refreshIntegration(task.id))),
     );
   }
 
+  // Only say something when it matters: green "all good" lines are left out.
+  const showStatus = status.color !== "#22C55E";
   return h(
     "div",
     { class: "int-card" },
-    header(
-      task.color,
-      task.id === "integration_claude" ? "VS Code" : task.name,
-      t(def?.subtitle ?? N_("Integration")),
-    ),
-    h("div", { class: "int-status" }, dot(status.color, 5), h("span", { text: status.label })),
+    header(task.color, task.name, ""),
+    showStatus
+      ? h("div", { class: "int-status" }, dot(status.color, 5), h("span", { text: status.label }))
+      : null,
     actions,
   );
 }
-
 // ── Vercel ────────────────────────────────────────────────────────────────────
 
 function vercelCard(onDetail: () => void): HTMLElement {
