@@ -188,7 +188,7 @@ export class Island {
       {
         style:
           "display:flex;align-items:center;margin-bottom:6px;padding-bottom:4px;" +
-          "border-bottom:1px solid rgba(255,255,255,0.1);cursor:move;user-select:none;touch-action:none;",
+          "border-bottom:1px solid rgba(255,255,255,0.1);cursor:grab;user-select:none;touch-action:none;",
       },
       h(
         "span",
@@ -231,6 +231,7 @@ export class Island {
     let dy = 0;
     head.addEventListener("pointerdown", (e) => {
       dragging = true;
+      head.style.cursor = "grabbing";
       dx = e.clientX - this.todoEl.offsetLeft;
       dy = e.clientY - this.todoEl.offsetTop;
       head.setPointerCapture(e.pointerId);
@@ -248,6 +249,7 @@ export class Island {
     const endDrag = (e: PointerEvent) => {
       if (!dragging) return;
       dragging = false;
+      head.style.cursor = "grab";
       if (head.hasPointerCapture(e.pointerId)) head.releasePointerCapture(e.pointerId);
       this.pushTodoRect();
     };
@@ -498,7 +500,7 @@ export class Island {
       h(
         "div",
         { style: "display:flex;align-items:center;gap:8px;" },
-        dot(vscodeDef?.color ?? "#FFFFFF", 6),
+        dot(vscodeDef?.color ?? "#007ACC", 6),
         h("span", { style: "font-size:12px;font-weight:500;" }, "VS Code"),
       ),
       h(
@@ -705,6 +707,7 @@ export class Island {
     if (!this.settingsOpen) return;
     this.settingsOpen = false;
     this.settingsPanelEl.style.display = "none";
+    this.settingsPos = null;
     this.pushTodoRect();
     State.notify();
   }
@@ -1670,7 +1673,7 @@ export class Island {
     const focus = State.focusTask;
     this.engine.bodyColor = planCardOpen()
       ? hexToRGB(openPlanColor())
-      : focus?.isIntegration && focus.id !== "integration_vscode"
+      : focus?.isIntegration
         ? hexToRGB(focus.color)
         : null;
     this.engine.particleOverhang = BOT_OVERHANG;

@@ -45,7 +45,7 @@ export const PILL_CATALOG: readonly PillDefinition[] = [
   {
     id: "integration_vscode",
     name: "VS Code",
-    color: "#FFFFFF",
+    color: "#007ACC",
     category: "workspace",
     subtitle: N_("Workspace"),
     source: "agent",

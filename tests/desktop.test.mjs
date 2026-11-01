@@ -30,10 +30,10 @@ test("agent work keeps him awake, idle and sleeping don't", () => {
   assert.equal(agentActive("sleeping"), false);
 });
 
-test("desktop Mochi keeps the selected provider color, with VS Code neutral", () => {
+test("desktop Mochi keeps the selected provider color, including VS Code", () => {
   assert.equal(desktopBodyColor("agent_gemini", "#4285F4"), "#4285F4");
   assert.equal(desktopBodyColor("integration_chatgpt", "#10A37F"), "#10A37F");
-  assert.equal(desktopBodyColor("integration_vscode", "#007ACC"), null);
+  assert.equal(desktopBodyColor("integration_vscode", "#007ACC"), "#007ACC");
   assert.equal(desktopBodyColor(null, "#D97757"), null);
 });
 

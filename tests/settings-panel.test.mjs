@@ -4,7 +4,7 @@ import { installFakeDom } from "./fakedom.mjs";
 import { Island } from "../src/island/island.ts";
 import { State } from "../src/core/state.ts";
 
-test("settings panel: open, close, and remember position across toggles", () => {
+test("settings panel: keep drop position while open and reset after close", () => {
   const dom = installFakeDom();
   const root = dom.root();
   globalThis.window = {
@@ -81,19 +81,54 @@ test("settings panel: open, close, and remember position across toggles", () => 
   assert.equal(parseInt(panel.style.left, 10), initialLeft + 200, "panel moved horizontally");
   assert.equal(parseInt(panel.style.top, 10), initialTop + 150, "panel moved vertically");
 
-  // Finish drag
+  // Release leaves Settings at the exact drop position while it stays open.
   upListeners[0]();
   assert.equal(moveListeners.length, 0, "move listeners cleaned up");
   assert.equal(upListeners.length, 0, "up listeners cleaned up");
+  assert.equal(parseInt(panel.style.left, 10), initialLeft + 200, "dropped left is retained");
+  assert.equal(parseInt(panel.style.top, 10), initialTop + 150, "dropped top is retained");
 
-  // Close and reopen: must remember the dragged position!
+  // Closing resets position state; reopening recomputes the default position.
   island.closeSettingsPanel();
   assert.equal(panel.style.display, "none", "panel closed");
 
   island.openSettingsPanel();
   assert.equal(panel.style.display, "block", "panel reopened");
-  assert.equal(parseInt(panel.style.left, 10), initialLeft + 200, "remembered dragged left");
-  assert.equal(parseInt(panel.style.top, 10), initialTop + 150, "remembered dragged top");
+  assert.equal(parseInt(panel.style.left, 10), initialLeft, "default left restored");
+  assert.equal(parseInt(panel.style.top, 10), initialTop, "default top restored");
+});
+
+test("to-do note drag uses the Settings hand cursor", () => {
+  const dom = installFakeDom();
+  const root = dom.root();
+  globalThis.window = {
+    innerWidth: 1920,
+    innerHeight: 1080,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    clearTimeout: () => {},
+    setTimeout: (fn) => fn(),
+  };
+
+  const island = new Island(root);
+  island.toggleTodo();
+  const widget = root.childNodes.find((n) => n.id === "todo-widget");
+  const header = widget.childNodes[0];
+  assert.equal(header.style.cursor, "grab", "idle header uses the open hand");
+
+  header.hasPointerCapture = () => false;
+  header.releasePointerCapture = () => {};
+  header.listeners.get("pointerdown")[0]({
+    pointerId: 1,
+    clientX: 40,
+    clientY: 40,
+    preventDefault: () => {},
+    stopPropagation: () => {},
+  });
+  assert.equal(header.style.cursor, "grabbing", "drag uses the closed hand");
+
+  header.listeners.get("pointerup")[0]({ pointerId: 1 });
+  assert.equal(header.style.cursor, "grab", "release restores the open hand");
 });
 
 test("settings panel: interactive controls do not initiate drag", () => {
