@@ -8,8 +8,6 @@ export type PillCategory = "workspace" | "agent" | "ai" | "service";
 /** Section titles (English keys, shown with `t()`), in display order. */
 export const PILL_CATEGORIES: { id: PillCategory; title: string }[] = [
   { id: "workspace", title: N_("Where you code") },
-  { id: "agent", title: N_("Agents") },
-  { id: "ai", title: N_("AI for the chat") },
   { id: "service", title: N_("Services") },
 ];
 
@@ -42,81 +40,36 @@ export interface PillDefinition {
 
 export type HostOs = "windows";
 
-const hooks: PillConnect = { kind: "hooks" };
-const key = (k: string): PillConnect => ({ kind: "key", key: k });
-const server = (field: "ollamaUrl" | "lmstudioUrl"): PillConnect => ({ kind: "server", field });
-
-/** Chat provider accent colors. */
-const ACCENT = {
-  anthropic: "#E07950",
-  google: "#4285F4",
-  openai: "#10A37F",
-  ollama: "#FACC15",
-  lmstudio: "#A3E635",
-};
-
 export const PILL_CATALOG: readonly PillDefinition[] = [
   // ── Where you code ─────────────────────────────────────────────────────────
-  
-  { id: "integration_vscode", name: "VS Code", color: "#FFFFFF", category: "workspace",
-    subtitle: N_("Workspace"), source: "agent", support: "yes", connect: { kind: "account", url: "https://code.visualstudio.com/" } },
-  
-  // Claude Code in Cursor's terminal: the same hooks as Claude Code.
-  { id: "agent_cursor", name: "Cursor", color: "#C0C4CC", category: "workspace",
-    subtitle: N_("Integration"), source: "agent", support: "yes", connect: hooks },
-  { id: "agent_antigravity", name: "Antigravity", color: "#E879F9", category: "workspace",
-    subtitle: N_("Integration"), source: "agent", support: "yes", connect: hooks },
-  // ── Agents ─────────────────────────────────────────────────────────────────
-  
-  { id: "agent_copilot", name: "Copilot CLI", color: "#818CF8", category: "agent",
-    subtitle: N_("Agent"), source: "agent", support: "yes", connect: hooks },
-  { id: "agent_muse", name: "Muse Code", color: "#38BDF8", category: "agent",
-    subtitle: N_("Agent"), source: "agent", support: "yes", connect: hooks },
-  // A plugin that starts the relay, written from Settings → Agents (agents.rs).
-  { id: "agent_opencode", name: "OpenCode", color: "#4ADE80", category: "agent",
-    subtitle: N_("Agent"), source: "agent", support: "yes", connect: hooks },
-  { id: "agent_amp", name: "Amp", color: "#F59E0B", category: "agent",
-    subtitle: N_("Agent"), source: "agent", support: "yes", connect: hooks },
-  { id: "agent_hermes", name: "Hermes", color: "#C084FC", category: "agent",
-    subtitle: N_("Agent"), source: "agent", support: "yes", connect: hooks },
-  // Claude Code sessions from the desktop app are tagged by the relay.
-  { id: "agent_claude-desktop", name: "Claude Desktop", color: "#D97757", category: "agent",
-    subtitle: N_("Agent"), source: "agent", support: "windows", connect: { kind: "none" } },
-  // ── AI for the chat ────────────────────────────────────────────────────────
-  { id: "ai_anthropic", name: "Anthropic", color: ACCENT.anthropic, category: "ai",
-    subtitle: N_("Chat"), source: "n8n", support: "yes", connect: key("anthropic-api-key") },
-  // The chat talks to each of them (src-tauri/src/chat.rs): a key for the
-  // cloud ones, a connected server for the local ones.
-  { id: "ai_google", name: "Google AI", color: ACCENT.google, category: "ai",
-    subtitle: N_("Chat"), source: "n8n", support: "yes", connect: key("google-api-key") },
-  { id: "ai_openai", name: "OpenAI", color: ACCENT.openai, category: "ai",
-    subtitle: N_("Chat"), source: "n8n", support: "yes", connect: key("openai-api-key") },
-  { id: "ai_ollama", name: "Ollama", color: ACCENT.ollama, category: "ai",
-    subtitle: N_("Chat"), source: "n8n", support: "yes", connect: server("ollamaUrl") },
-  { id: "ai_lmstudio", name: "LM Studio", color: ACCENT.lmstudio, category: "ai",
-    subtitle: N_("Chat"), source: "n8n", support: "yes", connect: server("lmstudioUrl") },
-  // ── Services ───────────────────────────────────────────────────────────────
-  { id: "integration_resend", name: "Resend", color: "#22C55E", category: "service",
-    subtitle: N_("Integration"), source: "n8n", support: "yes", connect: key("resend-api-key") },
-  { id: "integration_n8n", name: "n8n", color: "#F29B38", category: "service",
-    subtitle: N_("Integration"), source: "n8n", support: "yes", connect: key("n8n-api-key") },
-  { id: "integration_vercel", name: "Vercel", color: "#7C5CFF", category: "service",
-    subtitle: N_("Integration"), source: "n8n", support: "yes", connect: key("vercel-token") },
-  { id: "integration_github", name: "GitHub", color: "#F4505E", category: "service",
-    subtitle: N_("Account"), source: "n8n", support: "yes", connect: { kind: "account", url: "https://github.com/" } },
-  { id: "integration_notion", name: "Notion", color: "#8C8C8C", category: "service",
-    subtitle: N_("Integration"), source: "n8n", support: "yes", connect: key("notion-api-key") },
-  { id: "integration_calcom", name: "Cal.com", color: "#C9956A", category: "service",
-    subtitle: N_("Integration"), source: "n8n", support: "yes", connect: key("calcom-api-key") },
-  { id: "integration_stripe", name: "Stripe", color: "#0570DE", category: "service",
-    subtitle: N_("Integration"), source: "n8n", support: "yes", connect: key("stripe-api-key") },
+  {
+    id: "integration_vscode",
+    name: "VS Code",
+    color: "#FFFFFF",
+    category: "workspace",
+    subtitle: N_("Workspace"),
+    source: "agent",
+    support: "yes",
+    connect: { kind: "account", url: "https://code.visualstudio.com/" },
+  },
+  // ── Services / Account ─────────────────────────────────────────────────────
+  {
+    id: "integration_github",
+    name: "GitHub",
+    color: "#F4505E",
+    category: "service",
+    subtitle: N_("Integration"),
+    source: "n8n",
+    support: "yes",
+    connect: { kind: "account", url: "https://github.com/" },
+  },
 ];
 
 /** The always-on pill unless the user picks another workspace tool. */
 export const DEFAULT_MAIN_PILL = "integration_vscode";
 
 /** How many declared pills may sit next to the main one. */
-export const MAX_DECLARED = 5;
+export const MAX_DECLARED = 1;
 
 /** The OS this page runs on. Only the Windows webview says "Windows". */
 export const HOST_OS: HostOs = "windows";
@@ -131,11 +84,7 @@ function offeredOn(def: PillDefinition, os: HostOs): boolean {
 
 /** The pills this build offers, in catalog order. */
 export function availablePills(os: HostOs = HOST_OS): PillDefinition[] {
-    const accountHub = new Set([
-    
-    "integration_vscode", "integration_github",
-  ]);
-  return PILL_CATALOG.filter((p) => accountHub.has(p.id) && offeredOn(p, os));
+  return PILL_CATALOG.filter((p) => offeredOn(p, os));
 }
 
 export function isComingSoon(id: string): boolean {
@@ -155,9 +104,8 @@ export function mainPillChoices(os: HostOs = HOST_OS): PillDefinition[] {
 /** PillDefinition.sessionSubtitle — next to the name in a live session's card. */
 export function sessionSubtitle(id: string): string {
   switch (id) {
-    case "agent_cursor": return "Cursor";
-    case "agent_hermes": return "Hermes";
-    case "agent_claude-desktop": return "Claude Desktop";
+    case "integration_vscode": return "VS Code";
+    case "integration_github": return "GitHub";
     default: return N_("Agent");
   }
 }
@@ -170,64 +118,53 @@ export interface Declared {
 /**
  * The declaration as it may be used: a main pill this build can run (else the
  * default), and declared pills this build offers, without duplicates and
- * without the main pill, which never takes a slot. Same rules as
- * Windows app state integration loading.
+ * without the main pill, which never takes a slot.
  */
 export function sanitizeDeclared(d: Declared, os: HostOs = HOST_OS): Declared {
   const mains = new Set(mainPillChoices(os).map((p) => p.id));
   const mainPill = mains.has(d.mainPill) ? d.mainPill : DEFAULT_MAIN_PILL;
   const offered = new Set(availablePills(os).map((p) => p.id));
-  const hasRetiredPills = (d.activeIntegrations ?? []).some((id) => !offered.has(id));
   const activeIntegrations: string[] = [];
   for (const id of d.activeIntegrations ?? []) {
-    if (offered.has(id) && !activeIntegrations.includes(id)) {
-            activeIntegrations.push(id);
+    if (offered.has(id) && id !== mainPill && !activeIntegrations.includes(id)) {
+      activeIntegrations.push(id);
     }
   }
-  // A previous version stored only service pills, which this account hub no
-  // longer offers. Migrate that old default set to today's four Mochis once.
-  if (hasRetiredPills) {
-            activeIntegrations.splice(0, activeIntegrations.length,
-            "integration_github", "integration_vscode");  }
+  if (d.activeIntegrations == null && offered.has("integration_github") && mainPill !== "integration_github") {
+    activeIntegrations.push("integration_github");
+  }
   return { mainPill, activeIntegrations };
 }
 
 /**
  * Declares or undeclares a pill. Returns the new list, or null when the click
- * changes nothing: the main pill is never toggled, an unknown pill never
- * declared, and a fifth pill never added.
+ * changes nothing.
  */
 export function toggleDeclared(d: Declared, id: string, os: HostOs = HOST_OS): string[] | null {
-  
   if (!availablePills(os).some((p) => p.id === id)) return null;
+  if (id === d.mainPill) return null;
   if (d.activeIntegrations.includes(id)) return d.activeIntegrations.filter((x) => x !== id);
   if (d.activeIntegrations.length >= MAX_DECLARED) return null;
   return [...d.activeIntegrations, id];
 }
 
 /**
- * Picks a new main pill. The old main pill is not declared on its own, and the
- * new one leaves the declared list so it does not take a slot twice.
+ * Picks a new main pill.
  */
 export function chooseMainPill(d: Declared, id: string, os: HostOs = HOST_OS): Declared | null {
   if (!mainPillChoices(os).some((p) => p.id === id)) return null;
-    return { mainPill: id, activeIntegrations: d.activeIntegrations };
+  const activeIntegrations = d.activeIntegrations.filter((x) => x !== id);
+  return { mainPill: id, activeIntegrations };
 }
 
 /**
- * Pill order: the main pill first, then pills from outside the catalog (any
- * other tagged agent), then the catalog's pills in catalog order. Pills of equal
- * rank keep their order. Preserves catalog order, with the main
- * pill (not always VS Code here) leading.
+ * Pill order: the main pill first, then other catalog pills in catalog order.
  */
 export function orderPills<T extends { id: string }>(tasks: T[], mainPill: string): T[] {
   const index = new Map(PILL_CATALOG.map((p, i) => [p.id, i]));
-  const rank = (t: T) => (t.id === mainPill ? -2 : index.has(t.id) ? index.get(t.id)! : -1);
+  const rank = (t: T) => (t.id === mainPill ? -2 : index.has(t.id) ? index.get(t.id)! : 0);
   return tasks
     .map((t, i) => ({ t, i }))
     .sort((a, b) => rank(a.t) - rank(b.t) || a.i - b.i)
     .map(({ t }) => t);
 }
-
-
-

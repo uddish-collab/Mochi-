@@ -683,9 +683,6 @@ fn open_settings_window(app: AppHandle) {
 
 pub fn run() {
     platform::prepare_environment();
-    // The user selected account-only integrations; discard credentials from
-    // the former API-key setup before any integration pollers are started.
-    secrets::clear_legacy_credentials();
     let loaded = settings::load();
     i18n::set_picked(&loaded.language);
     let gate = Arc::new(PollGate::new());

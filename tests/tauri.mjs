@@ -19,6 +19,16 @@ export const internals = {
   },
 };
 
+export const invoke = async (cmd, args) => internals.invoke(cmd, args);
+export const listen = async (event, handler) => {
+  listeners.set(event, handler);
+  return () => listeners.delete(event);
+};
+export const emitTo = async (label, event, payload) => emit(event, payload);
+export const getCurrentWebview = () => ({
+  onDragDropEvent: () => () => {},
+});
+
 /** Fires an event the way the Rust side would. */
 export function emit(event, payload) {
   const handler = listeners.get(event);

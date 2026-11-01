@@ -21,7 +21,10 @@ import { UploadCanvas } from "../upload/canvas";
 import { USC, UploadSeq } from "../upload/sequence";
 import { closePlanCard, openPlanColor, planCardOpen } from "../views/usage";
 import { buildHeader, buildViews, type ViewActions, type ViewHost } from "../views/views";
-import { h } from "../views/dom";
+import { h, clear, dot, svg } from "../views/dom";
+import { ICONS } from "../views/icons";
+import { tl } from "../i18n/i18n";
+import { pillDefinition } from "../core/pills";
 import { IslandStateMachine } from "./fsm";
 import { refreshHookPills } from "./integrations";
 import { DesktopLink } from "./desktop";
@@ -61,6 +64,8 @@ export class Island {
   private todoListEl!: HTMLElement;
   private todoOpen = false;
   private todoTasks: TodoTask[] = this.loadTodos();
+  private settingsPanelEl!: HTMLElement;
+  private settingsOpen = false;
 
   private header!: ViewHost;
   private views!: Map<IslandViewName, ViewHost>;
@@ -327,7 +332,13 @@ export class Island {
   private pushTodoRect() {
     if (!IS_TAURI) return;
     let x = 0, y = 0, w = 0, hh = 0;
-    if (this.todoOpen) {
+    if (this.settingsOpen && this.settingsPanelEl) {
+      const r = this.settingsPanelEl.getBoundingClientRect();
+      x = r.left;
+      y = r.top;
+      w = r.width;
+      hh = r.height;
+    } else if (this.todoOpen) {
       const r = this.todoEl.getBoundingClientRect();
       x = r.left;
       y = r.top;
@@ -363,6 +374,285 @@ export class Island {
       this.closeTodo();
     } else {
       this.openTodo();
+    }
+  }
+
+  // ── Settings Panel ─────────────────────────────────────────────────────────
+
+  private buildSettingsPanel() {
+    this.settingsPanelEl = h("div", {
+      id: "mochi-settings-panel",
+      style:
+        "position:fixed;left:0;top:0;width:260px;box-sizing:border-box;" +
+        "background:rgba(20,20,24,0.92);backdrop-filter:blur(24px) saturate(180%);" +
+        "-webkit-backdrop-filter:blur(24px) saturate(180%);" +
+        "border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:12px 14px;" +
+        "z-index:35;display:none;box-shadow:0 12px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06);" +
+        "color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;",
+    });
+    this.renderSettingsPanelContent();
+  }
+
+  private renderSettingsPanelContent() {
+    if (!this.settingsPanelEl) return;
+    clear(this.settingsPanelEl);
+
+    // Header
+    const closeBtn = h(
+      "button",
+      {
+        title: tl("Close"),
+        style:
+          "background:transparent;border:0;color:#888;cursor:pointer;padding:2px;display:flex;" +
+          "align-items:center;justify-content:center;border-radius:50%;width:20px;height:20px;",
+        onclick: (e: Event) => {
+          e.stopPropagation();
+          this.closeSettingsPanel();
+        },
+      },
+      svg(ICONS.xmark, 10),
+    );
+    closeBtn.addEventListener("mouseenter", () => {
+      closeBtn.style.color = "#fff";
+      closeBtn.style.background = "rgba(255,255,255,0.1)";
+    });
+    closeBtn.addEventListener("mouseleave", () => {
+      closeBtn.style.color = "#888";
+      closeBtn.style.background = "transparent";
+    });
+
+    const header = h(
+      "div",
+      {
+        style:
+          "display:flex;align-items:center;justify-content:space-between;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.08);",
+      },
+      h("span", { style: "font-size:13px;font-weight:600;letter-spacing:-0.2px;color:#fff;" }, tl("Settings")),
+      closeBtn,
+    );
+
+    // Section 1: Active Pills
+    const pillsTitle = h("div", {
+      style:
+        "font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;color:rgba(255,255,255,0.45);margin-top:10px;margin-bottom:6px;",
+      text: "Active Pills",
+    });
+
+    const vscodeDef = pillDefinition("integration_vscode");
+    const vscodeRow = h(
+      "div",
+      {
+        style:
+          "display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.04);margin-bottom:4px;",
+      },
+      h(
+        "div",
+        { style: "display:flex;align-items:center;gap:8px;" },
+        dot(vscodeDef?.color ?? "#FFFFFF", 6),
+        h("span", { style: "font-size:12px;font-weight:500;" }, "VS Code"),
+      ),
+      h(
+        "span",
+        {
+          style:
+            "font-size:10px;color:rgba(255,255,255,0.45);background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px;",
+        },
+        "Workspace",
+      ),
+    );
+
+        const githubDef = pillDefinition("integration_github");
+    const githubRow = h(
+      "div",
+      {
+        style:
+          "display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.04);",
+      },
+      h(
+        "div",
+        { style: "display:flex;align-items:center;gap:8px;" },
+        dot(githubDef?.color ?? "#F4505E", 6),
+        h("span", { style: "font-size:12px;font-weight:500;" }, "GitHub"),
+      ),
+      h(
+        "span",
+        {
+          style:
+            "font-size:10px;color:rgba(255,255,255,0.45);background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px;",
+        },
+        tl("Connected"),
+      ),
+    );
+
+    // Section 2: Sound
+    const soundTitle = h("div", {
+      style:
+        "font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;color:rgba(255,255,255,0.45);margin-top:10px;margin-bottom:6px;",
+      text: tl("Sound"),
+    });
+
+    const soundSwitch = h("button", {
+      class: State.settings.soundEnabled ? "switch on" : "switch",
+      onclick: (e: Event) => {
+        e.stopPropagation();
+        State.settings.soundEnabled = !State.settings.soundEnabled;
+        Sound.setEnabled(State.settings.soundEnabled);
+        void Bridge.saveSettings(State.settings);
+        State.notify();
+        this.renderSettingsPanelContent();
+      },
+    });
+    const soundRow = h(
+      "div",
+      {
+        style:
+          "display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.04);margin-bottom:4px;",
+      },
+      h("span", { style: "font-size:12px;font-weight:500;" }, tl("Sound")),
+      soundSwitch,
+    );
+
+    const volumeInput = h("input", {
+      type: "range",
+      min: "0",
+      max: "0.2",
+      step: "0.005",
+      style: `width:90px;accent-color:#22C55E;opacity:${State.settings.soundEnabled ? "1" : "0.4"}`,
+      oninput: (e: Event) => {
+        const v = Number((e.target as HTMLInputElement).value);
+        State.settings.soundVolume = v;
+        Sound.setVolume(v);
+        void Bridge.saveSettings(State.settings);
+      },
+    }) as HTMLInputElement;
+    volumeInput.value = String(State.settings.soundVolume);
+
+    const volumeRow = h(
+      "div",
+      {
+        style:
+          "display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.04);",
+      },
+      h("span", { style: "font-size:12px;font-weight:500;color:rgba(255,255,255,0.7);" }, tl("Volume")),
+      volumeInput,
+    );
+
+    // Section 3: Island
+    const islandTitle = h("div", {
+      style:
+        "font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;color:rgba(255,255,255,0.45);margin-top:10px;margin-bottom:6px;",
+      text: "Island",
+    });
+
+    const hoverSwitch = h("button", {
+      class: State.settings.openOnHover ? "switch on" : "switch",
+      onclick: (e: Event) => {
+        e.stopPropagation();
+        State.settings.openOnHover = !State.settings.openOnHover;
+        this.fsm.openOnHover = State.settings.openOnHover;
+        void Bridge.saveSettings(State.settings);
+        State.notify();
+        this.renderSettingsPanelContent();
+      },
+    });
+    const hoverRow = h(
+      "div",
+      {
+        style:
+          "display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.04);margin-bottom:4px;",
+      },
+      h("span", { style: "font-size:12px;font-weight:500;" }, tl("Open on hover")),
+      hoverSwitch,
+    );
+
+    const autoCloseRow = h(
+      "div",
+      {
+        style:
+          "display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.04);",
+      },
+      h("span", { style: "font-size:12px;font-weight:500;color:rgba(255,255,255,0.7);" }, tl("Auto-close")),
+      h("span", { style: "font-size:11px;color:rgba(255,255,255,0.5);font-variant-numeric:tabular-nums;" }, `${Math.round(State.settings.autoCloseInterval)}s`),
+    );
+
+    // Section 4: Footer
+    const footer = h(
+      "div",
+      {
+        style:
+          "display:flex;justify-content:flex-end;margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);",
+      },
+      h("button", {
+        class: "link-btn",
+        style: "background:transparent;border:0;color:#8e939c;font-size:11px;cursor:pointer;padding:2px 4px;",
+        text: tl("Settings…"),
+        onclick: (e: Event) => {
+          e.stopPropagation();
+          void Bridge.openSettingsWindow();
+        },
+      }),
+    );
+
+    this.settingsPanelEl.append(
+      header,
+      pillsTitle,
+      vscodeRow,
+      githubRow,
+      soundTitle,
+      soundRow,
+      volumeRow,
+      islandTitle,
+      hoverRow,
+      autoCloseRow,
+      footer,
+    );
+  }
+
+    private positionSettingsPanel() {
+    if (!this.settingsOpen || !this.settingsPanelEl) return;
+    const r = this.islandRect();
+    const SETTINGS_GAP = 10;
+    const panelW = 260;
+    const panelH = this.settingsPanelEl.offsetHeight || 300;
+    const maxX = Math.max(0, window.innerWidth - panelW - 10);
+    const maxY = Math.max(0, window.innerHeight - panelH - 10);
+    let left = r.x + r.w + SETTINGS_GAP;
+    if (left > maxX && r.x - panelW - SETTINGS_GAP >= 10) {
+      left = r.x - panelW - SETTINGS_GAP;
+    } else {
+      left = clamp(left, 10, maxX);
+    }
+    const top = clamp(r.y, 10, maxY);
+    this.settingsPanelEl.style.left = `${left}px`;
+    this.settingsPanelEl.style.top = `${top}px`;
+    this.pushTodoRect();
+  }
+
+  openSettingsPanel() {
+    if (this.todoOpen) this.closeTodo();
+    this.settingsOpen = true;
+    this.settingsPanelEl.style.display = "block";
+    this.renderSettingsPanelContent();
+    this.positionSettingsPanel();
+    Sound.play("blip");
+    this.pushTodoRect();
+    State.notify();
+  }
+
+  closeSettingsPanel() {
+    if (!this.settingsOpen) return;
+    this.settingsOpen = false;
+    this.settingsPanelEl.style.display = "none";
+    this.pushTodoRect();
+    State.notify();
+  }
+
+  toggleSettingsPanel() {
+    if (this.settingsOpen) {
+      Sound.play("blip");
+      this.closeSettingsPanel();
+    } else {
+      this.openSettingsPanel();
     }
   }
 
@@ -479,6 +769,8 @@ export class Island {
         State.notify();
       },
       openSettingsWindow: () => void Bridge.openSettingsWindow(),
+      toggleSettingsPanel: () => this.toggleSettingsPanel(),
+      isSettingsOpen: () => this.settingsOpen,
       blip: () => Sound.play("blip"),
       chooseOutfit: (selection) => {
         const mochiId = State.focusedMochiId;
@@ -503,6 +795,7 @@ export class Island {
     this.countdown = h("div", { id: "countdown" });
 
     this.buildTodo();
+    this.buildSettingsPanel();
 
     this.header = buildHeader(actions);
 
@@ -576,7 +869,7 @@ export class Island {
 
     // The widget lives on the root, not in the island: the island is transformed
     // and clipped, which would pin the widget to it.
-    this.root.append(this.wakeStrip, this.islandEl, this.todoEl);
+    this.root.append(this.wakeStrip, this.islandEl, this.todoEl, this.settingsPanelEl);
     this.applyGeometry();
   }
 
@@ -627,6 +920,7 @@ export class Island {
     }
     if (mode !== "expanded") {
       closePlanCard();
+      this.closeSettingsPanel();
       this.engine.resetMorph();
       UploadSeq.deactivate();
     }
@@ -634,6 +928,7 @@ export class Island {
     // widget could be seen or reached any more.
     if (mode === "hidden") {
       this.closeTodo();
+      this.closeSettingsPanel();
       // The wake strip is always top-centre: so is the island when it comes back.
       this.islandOffset = { x: 0, y: 0 };
       this.islandPress = null;
@@ -913,6 +1208,7 @@ export class Island {
     ) {
       this.pushedRect = rect;
       void Bridge.setIslandRect(rect.x, rect.y, rect.w, rect.h);
+      if (this.settingsOpen) this.positionSettingsPanel();
     }
   }
 
@@ -1062,10 +1358,17 @@ export class Island {
       if (this.desktop.carrying) this.desktop.carryEnd(e.clientX, e.clientY);
     });
 
-    window.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && State.mode === "expanded") {
-        if (State.pendingApproval) this.foldApproval();
-        else if (!State.isPinned) this.collapse();
+        window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        if (this.settingsOpen) {
+          this.closeSettingsPanel();
+          e.stopPropagation();
+          return;
+        }
+        if (State.mode === "expanded") {
+          if (State.pendingApproval) this.foldApproval();
+          else if (!State.isPinned) this.collapse();
+        }
       }
       State.lastActivity = performance.now();
     });

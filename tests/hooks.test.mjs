@@ -8,7 +8,7 @@ import { calls, emit, sent } from "./tauri.mjs";
 import { registerHookHandlers } from "../src/island/hooks.ts";
 import { DEFAULT_SETTINGS, State } from "../src/core/state.ts";
 
-const CLAUDE = "integration_claude";
+const CLAUDE = "integration_vscode";
 
 /** What the handler asked the island to do, in order. */
 let asked;
@@ -168,7 +168,7 @@ test("an alert on an island that is already open only switches its view", () => 
 });
 
 test("a session finishing behind another pill only badges its own, for 5.2 s", () => {
-  State.setFocus("integration_n8n");
+  State.setFocus("integration_github");
   hook({ hook_event_name: "Stop" });
   assert.deepEqual(asked, []);
   assert.equal(task().pillBadge, "finished");
@@ -180,7 +180,7 @@ test("a failed stop shows the error view, or the error badge behind another pill
   hook({ hook_event_name: "StopFailure" });
   assert.equal(task().state, "error");
   assert.deepEqual(asked, ["alert:error"]);
-  State.setFocus("integration_n8n");
+  State.setFocus("integration_github");
   hook({ hook_event_name: "StopFailure" });
   assert.equal(task().pillBadge, "error");
 });
@@ -204,24 +204,17 @@ test("a new turn within 5.2 s of a stop is not put back to idle", () => {
   assert.equal(task().state, "thinking");
 });
 
-// ── Other agents ──────────────────────────────────────────────────────────────
+// ── External agents & permission safety ──────────────────────────────────────
 
-test("a tagged agent gets its own pill next to Claude Code's", () => {
+test("external agent events do not mutate the VS Code workspace pill or add pills", () => {
   hook({ hook_event_name: "PreToolUse", cwd: "/p/proj", coucou_agent: "gemini", tool_name: "Bash", tool_input: { command: "ls" } });
   assert.equal(State.tasks[0].id, CLAUDE);
-  assert.equal(State.tasks[1].id, "agent_gemini");
-  const agent = task("agent_gemini");
-  assert.equal(agent.name, "Gemini CLI");
-  assert.equal(agent.source, "agent");
-  assert.equal(agent.state, "working");
-  assert.deepEqual(agent.steps, ["Runs · ls"]);
-  assert.match(agent.color, /^#[0-9A-F]{6}$/);
-  // Claude Code's own pill is not the one that moved.
-  assert.equal(task().name, "VS Code");
   assert.equal(task().state, "idle");
+  assert.deepEqual(task().steps, []);
+  assert.equal(State.tasks.some((t) => t.id.startsWith("agent_")), false);
 });
 
-test("an invalid or reserved agent tag falls back to the Claude Code pill", () => {
+test("an invalid or reserved agent tag falls back to the workspace pill", () => {
   for (const tag of ["claude", "Gemini", "has space", "a".repeat(25), ""]) {
     hook({ hook_event_name: "SessionStart", cwd: "/p/proj", coucou_agent: tag });
   }
@@ -229,166 +222,24 @@ test("an invalid or reserved agent tag falls back to the Claude Code pill", () =
   assert.equal(task().name, "proj");
 });
 
-test("an agent's pill goes away when its session ends, or 5.2 s after it stops", () => {
-  hook({ hook_event_name: "SessionStart", coucou_agent: "gemini" });
-  hook({ hook_event_name: "SessionEnd", coucou_agent: "gemini" });
-  assert.equal(task("agent_gemini"), undefined);
-
-  hook({ hook_event_name: "SessionStart", coucou_agent: "codex" });
-  hook({ hook_event_name: "Stop", coucou_agent: "codex" });
-  assert.equal(task("agent_codex").state, "finished");
-  seconds(5.2);
-  assert.equal(task("agent_codex"), undefined);
-});
-
-test("an agent's permission request is declined, never shown as Claude Code's", () => {
-  for (const agent of ["gemini", "antigravity", "cursor", "opencode", "amp", "hermes", "my-tool"]) {
+test("an external agent's permission request is declined, never shown as VS Code's", () => {
+  for (const agent of ["gemini", "antigravity", "cursor", "opencode", "amp", "hermes", "my-tool", "codex", "copilot", "muse"]) {
     calls.length = 0;
     hook({ hook_event_name: "PermissionRequest", request_id: "r1", coucou_agent: agent, tool_name: "Bash" });
     assert.deepEqual(sent("approval_decline"), [{ requestId: "r1" }], agent);
     assert.deepEqual(sent("approval_ack"), [], agent);
     assert.equal(State.pendingApproval, null, agent);
+    assert.equal(task().state, "idle", agent);
   }
 });
 
-test("Codex, Copilot CLI and Muse Code get the card on their own pill", () => {
-  for (const agent of ["codex", "copilot", "muse"]) {
-    State.pendingApproval = null;
-    State.focusId = CLAUDE;
-    calls.length = 0;
-    asked = [];
-    hook({
-      hook_event_name: "PermissionRequest", request_id: `r-${agent}`, session_id: "s1",
-      coucou_agent: agent, tool_name: "Bash", tool_input: { command: "npm publish" },
-    });
-    const id = `agent_${agent}`;
-    assert.deepEqual(State.pendingApproval, {
-      requestId: `r-${agent}`, sessionId: "s1", pillId: id, tool: "Bash", command: "Bash · npm publish",
-    });
-    assert.deepEqual(sent("approval_ack"), [{ requestId: `r-${agent}` }]);
-    assert.deepEqual(sent("approval_decline"), []);
-    // The same card as Claude Code's: it comes up and its pill comes to the
-    // front, even from behind Claude Code's pill (unified with Mac #120).
-    assert.equal(task(id).state, "approval");
-    assert.equal(State.focusId, id);
-    assert.deepEqual(asked, ["alert:approval"]);
-    // Claude Code's pill is untouched, and comes back once the card goes.
-    assert.equal(task().state, "idle");
-    assert.equal(task().pillBadge ?? null, null);
-    State.endApproval();
-    assert.equal(State.focusId, CLAUDE);
-  }
-});
-
-test("an agent's turn ending takes its card down and gives the front back", () => {
-  State.setFocus("integration_n8n");
-  hook({ hook_event_name: "PermissionRequest", request_id: "r1", session_id: "s1", coucou_agent: "codex", tool_name: "Bash" });
-  assert.equal(State.focusId, "agent_codex");
-  asked = [];
-  hook({ hook_event_name: "Stop", session_id: "s1", coucou_agent: "codex" });
-  assert.equal(State.pendingApproval, null);
-  assert.equal(State.focusId, "integration_n8n");
-  // The stop no longer has the front: its pill is badged, the view is not taken.
-  assert.equal(task("agent_codex").pillBadge, "finished");
-  assert.ok(!asked.includes("alert:finished"));
-});
-
-test("an agent's card comes up at once when its pill has the focus", () => {
-  hook({ hook_event_name: "SessionStart", session_id: "s1", coucou_agent: "codex" });
-  State.setFocus("agent_codex");
-  asked = [];
-  hook({ hook_event_name: "PermissionRequest", request_id: "r1", session_id: "s1", coucou_agent: "codex", tool_name: "Bash" });
-  assert.deepEqual(asked, ["alert:approval"]);
-});
-
-test("only Claude Code's questions become a question card", () => {
-  hook({
-    hook_event_name: "PermissionRequest", request_id: "r1", session_id: "s1", coucou_agent: "codex",
-    tool_name: "AskUserQuestion",
-    tool_input: { questions: [{ question: "Which?", options: [{ label: "A" }, { label: "B" }] }] },
-  });
-  assert.equal(State.pendingApproval.questions, undefined);
-  assert.equal(task("agent_codex").state, "approval");
-});
-
-test("the end of the turn takes a waiting card down and releases the relay", () => {
-  for (const end of ["Stop", "StopFailure", "UserPromptSubmit", "SessionEnd", "Interrupt"]) {
-    State.pendingApproval = null;
-    calls.length = 0;
-    hook({ hook_event_name: "PermissionRequest", request_id: "r1", session_id: "s1", coucou_agent: "codex", tool_name: "Bash" });
-    // Another session's turn ending changes nothing.
-    hook({ hook_event_name: end, session_id: "other", coucou_agent: "codex" });
-    assert.equal(State.pendingApproval?.requestId, "r1", end);
-    hook({ hook_event_name: end, session_id: "s1", coucou_agent: "codex" });
-    assert.equal(State.pendingApproval, null, end);
-    assert.deepEqual(sent("approval_decline"), [{ requestId: "r1" }], end);
-    mock.timers.runAll();
-  }
-});
-
-test("Codex's Interrupt puts its pill back to idle", () => {
-  hook({ hook_event_name: "UserPromptSubmit", session_id: "s1", coucou_agent: "codex", prompt: "go" });
-  assert.equal(task("agent_codex").state, "thinking");
-  hook({ hook_event_name: "Interrupt", session_id: "s1", coucou_agent: "codex" });
-  assert.equal(task("agent_codex").state, "idle");
-});
-
-test("Hermes says where a gateway session comes from", () => {
-  hook({ hook_event_name: "SessionStart", coucou_agent: "hermes", platform: "telegram" });
-  assert.deepEqual(task("agent_hermes").steps, ["Telegram"]);
-  hook({ hook_event_name: "SessionEnd", coucou_agent: "hermes" });
-  hook({ hook_event_name: "SessionStart", coucou_agent: "hermes", platform: "cli" });
-  assert.deepEqual(task("agent_hermes").steps, []);
-});
-
-test("an agent's last words show when it stops", () => {
-  hook({ hook_event_name: "SessionStart", coucou_agent: "hermes" });
-  hook({ hook_event_name: "Stop", coucou_agent: "hermes", last_assistant_message: "All done, tests pass." });
-  assert.deepEqual(task("agent_hermes").steps, ["All done, tests pass."]);
-});
-
-test("a Claude Desktop session gets the Claude Desktop pill, in its colour (Mac #191)", () => {
-  hook({ hook_event_name: "SessionStart", cwd: "C:\\p\\proj", session_id: "d1", coucou_agent: "claude-desktop" });
-  const desktop = task("agent_claude-desktop");
-  assert.equal(desktop.color, "#D97757");
-  assert.equal(desktop.sessionId, "d1");
-  assert.equal(task().state, "idle");
-  // Its permission requests are answered in the app, as on macOS.
-  hook({ hook_event_name: "PermissionRequest", request_id: "r1", coucou_agent: "claude-desktop", tool_name: "Bash" });
-  assert.deepEqual(sent("approval_decline"), [{ requestId: "r1" }]);
-});
-
-// ── Main tool and Cursor ──────────────────────────────────────────────────────
-
-test("Claude Code in Cursor's terminal works on the Cursor pill, made for the session", () => {
+test("terminal sessions in cursor route to the workspace pill", () => {
   hook({ hook_event_name: "SessionStart", cwd: "/p/proj", session_id: "s9", term_editor: "cursor" });
   hook({ hook_event_name: "PreToolUse", cwd: "/p/proj", term_editor: "cursor", tool_name: "Bash", tool_input: { command: "ls" } });
-  assert.equal(task("agent_cursor").state, "working");
-  assert.equal(task("agent_cursor").sessionId, "s9");
-  assert.equal(task().state, "idle");
+  assert.equal(task().state, "working");
+  assert.equal(task().sessionId, "s9");
   hook({ hook_event_name: "SessionEnd", term_editor: "cursor" });
-  assert.equal(task("agent_cursor"), undefined);
-});
-
-test("with another main tool, Claude Code's pill comes for the session and goes after", () => {
-  State.settings.mainPill = "agent_codex";
-  State.loadIntegrationTasks();
-  assert.equal(task(), undefined);
-  hook({ hook_event_name: "SessionStart", cwd: "/p/proj" });
-  assert.equal(task().name, "proj");
-  assert.equal(State.tasks[0].id, "agent_codex");
-  hook({ hook_event_name: "SessionEnd" });
-  assert.equal(task(), undefined);
-});
-
-test("the main tool's agent sessions put it back as it was, never take it away", () => {
-  State.settings.mainPill = "agent_codex";
-  State.loadIntegrationTasks();
-  hook({ hook_event_name: "SessionStart", coucou_agent: "codex" });
-  hook({ hook_event_name: "Stop", coucou_agent: "codex" });
-  seconds(5.2);
-  assert.equal(task("agent_codex").state, "idle");
-  assert.equal(task("agent_codex").name, "Codex");
+  assert.equal(task().state, "idle");
 });
 
 // ── Permission requests ───────────────────────────────────────────────────────
@@ -435,27 +286,27 @@ test("the card names the most specific thing the tool carries", () => {
 });
 
 test("a request behind another pill comes to the front, and that pill comes back after (Mac #120)", () => {
-  State.setFocus("integration_n8n");
+  State.setFocus("integration_github");
   ask("r1");
   assert.deepEqual(asked, ["alert:approval"]);
   assert.equal(State.focusId, CLAUDE);
   assert.deepEqual(sent("approval_ack"), [{ requestId: "r1" }]);
   State.endApproval();
-  assert.equal(State.focusId, "integration_n8n");
+  assert.equal(State.focusId, "integration_github");
   assert.equal(State.isPinned, false);
   assert.equal(task().state, "working");
 });
 
 test("the pill you were on comes back after a withdrawn card too", () => {
-  State.setFocus("integration_n8n");
+  State.setFocus("integration_github");
   ask("r1");
   seconds(110);
   assert.equal(State.pendingApproval, null);
-  assert.equal(State.focusId, "integration_n8n");
+  assert.equal(State.focusId, "integration_github");
 });
 
 test("a pill picked while the card was up keeps the front after the answer", () => {
-  State.setFocus("integration_n8n");
+  State.setFocus("integration_github");
   ask("r1");
   State.setFocus("integration_github");
   State.endApproval();
@@ -480,25 +331,19 @@ test("a question is what the island reopens on while it waits", () => {
 });
 
 test("a finished or failed session behind a waiting card only badges its pill", () => {
-  State.settings.activeIntegrations = ["agent_gemini"];
+  State.settings.activeIntegrations = ["integration_github"];
   State.loadIntegrationTasks();
-  hook({ hook_event_name: "SessionStart", coucou_agent: "gemini" });
-  ask("r1");
-  asked = [];
-  State.focusId = "agent_gemini";
-  hook({ hook_event_name: "Stop", coucou_agent: "gemini" });
-  hook({ hook_event_name: "StopFailure", coucou_agent: "gemini" });
-  assert.deepEqual(asked, []);
-  assert.equal(task("agent_gemini").pillBadge, "error");
+  State.focusId = "integration_github";
+  hook({ hook_event_name: "StopFailure" });
+  assert.equal(task().pillBadge, "error");
 });
 
-test("a request from Claude Code in Cursor's terminal goes on the Cursor pill", () => {
+test("a request from Cursor's terminal goes on the workspace pill", () => {
   ask("r1", { term_editor: "cursor" });
-  assert.equal(State.pendingApproval.pillId, "agent_cursor");
-  assert.equal(task("agent_cursor").state, "approval");
-  assert.equal(task("agent_cursor").name, "proj");
-  assert.equal(State.focusId, "agent_cursor");
-  assert.equal(task().state, "idle");
+  assert.equal(State.pendingApproval.pillId, CLAUDE);
+  assert.equal(task().state, "approval");
+  assert.equal(task().name, "proj");
+  assert.equal(State.focusId, CLAUDE);
 });
 
 test("a second request never replaces the card: it goes back to the terminal", () => {
@@ -578,7 +423,7 @@ test("a permission request within 5.2 s of a stop keeps its card", () => {
 });
 
 test("a permission request behind another pill keeps the front past the stop timer", () => {
-  State.setFocus("integration_n8n");
+  State.setFocus("integration_github");
   afterStop(() => ask("r1"));
   assert.equal(task().state, "approval");
   assert.equal(State.focusId, CLAUDE);
@@ -598,34 +443,25 @@ test("a question within 5.2 s of a stop stays a question", () => {
 test("a failed stop within 5.2 s of a stop stays an error, badge included", () => {
   afterStop({ hook_event_name: "StopFailure" });
   assert.equal(task().state, "error");
-  State.setFocus("integration_n8n");
+  State.setFocus("integration_github");
   afterStop({ hook_event_name: "StopFailure" });
   assert.equal(task().state, "error");
   assert.equal(task().pillBadge, "error");
 });
 
 test("a new turn behind another pill drops the finished badge straight away", () => {
-  State.setFocus("integration_n8n");
+  State.setFocus("integration_github");
   hook({ hook_event_name: "Stop" });
   assert.equal(task().pillBadge, "finished");
   hook({ hook_event_name: "UserPromptSubmit", prompt: "next" });
   assert.equal(task().pillBadge, null);
 });
 
-test("an agent that goes back to work within 5.2 s of its stop keeps its pill", () => {
+test("going back to work within 5.2 s of its stop keeps working", () => {
   afterStop(
     { hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "ls" } },
-    { coucou_agent: "gemini" },
   );
-  assert.equal(task("agent_gemini").state, "working");
-});
-
-test("an agent's session ending takes its stop timer with it", () => {
-  hook({ hook_event_name: "Stop", coucou_agent: "gemini" });
-  hook({ hook_event_name: "SessionEnd", coucou_agent: "gemini" });
-  hook({ hook_event_name: "SessionStart", coucou_agent: "gemini" });
-  seconds(5.2);
-  assert.notEqual(task("agent_gemini"), undefined);
+  assert.equal(task().state, "working");
 });
 
 test("a second stop restarts the 5.2 s: the first stop's timer no longer counts", () => {
@@ -643,7 +479,7 @@ test("a second stop restarts the 5.2 s: the first stop's timer no longer counts"
 });
 
 test("the end of a Claude Code session leaves no stop timer behind", () => {
-  State.setFocus("integration_n8n");
+  State.setFocus("integration_github");
   hook({ hook_event_name: "Stop", cwd: "/p/proj" });
   hook({ hook_event_name: "SessionEnd", cwd: "/p/proj" });
   assert.equal(task().state, "idle");
@@ -657,11 +493,10 @@ test("the end of a Claude Code session leaves no stop timer behind", () => {
   assert.equal(task().pillBadge, "error");
 });
 
-test("one pill going back to work leaves another pill's stop timer running", () => {
-  hook({ hook_event_name: "Stop", coucou_agent: "gemini" });
+test("resuming work resets stop timer", () => {
+  hook({ hook_event_name: "Stop" });
   afterStop({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "ls" } });
   assert.equal(task().state, "working");
-  assert.equal(task("agent_gemini"), undefined);
 });
 
 for (const [what, event] of [

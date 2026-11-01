@@ -9,7 +9,7 @@ import { registerHookHandlers } from "../src/island/hooks.ts";
 import { DEFAULT_SETTINGS, DIFF_TTL_MS, MAX_DIFFS_PER_PILL, State } from "../src/core/state.ts";
 import { parseDiffStep } from "../src/core/diff.ts";
 
-const CLAUDE = "integration_claude";
+const CLAUDE = "integration_vscode";
 
 const island = { alert() {}, setView() {}, reveal() {}, dropPin() {} };
 registerHookHandlers(island);
@@ -108,13 +108,13 @@ test("diffs are forgotten an hour after the last one, and at the end of the sess
   assert.equal(diffs().length, 0);
 });
 
-test("an agent pill's diffs go with the pill", () => {
+test("an external agent without a pill stores no diffs", () => {
   hook({ hook_event_name: "PreToolUse", coucou_agent: "gemini", tool_name: "Edit", tool_input: { file_path: "/p/a.ts" } });
   edit({ coucou_agent: "gemini" });
-  assert.equal(diffs("agent_gemini").length, 1);
-  hook({ hook_event_name: "SessionEnd", coucou_agent: "gemini" });
-  assert.equal(task("agent_gemini"), undefined);
   assert.equal(State.sessionDiffs.has("agent_gemini"), false);
+  assert.equal(diffs(CLAUDE).length, 0);
+  hook({ hook_event_name: "SessionEnd", coucou_agent: "gemini" });
+  assert.equal(task(CLAUDE).state, "idle");
   // An event for a pill that does not exist stores nothing.
   edit({ coucou_agent: "ghost" });
   assert.equal(State.sessionDiffs.has("agent_ghost"), false);

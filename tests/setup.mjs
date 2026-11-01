@@ -10,6 +10,9 @@ import { internals } from "./tauri.mjs";
 // The sources import each other without an extension, which Vite resolves.
 registerHooks({
   resolve(specifier, context, nextResolve) {
+    if (specifier.startsWith("@tauri-apps/api")) {
+      return { url: new URL("./tauri.mjs", import.meta.url).href, shortCircuit: true };
+    }
     const ours = !context.parentURL?.includes("/node_modules/");
     if (ours && specifier.startsWith(".") && !/\.(?:[cm]?[jt]s|json)$/.test(specifier)) {
       return nextResolve(`${specifier}.ts`, context);

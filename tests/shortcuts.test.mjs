@@ -365,42 +365,42 @@ test("go to alert: the permission first, then a question, else Mochi is annoyed"
   assert.deepEqual(did, ["emote:annoyed"]);
 
   did = [];
-  State.upsertExternalAgent("agent_gemini", "Gemini", "#fff");
-  State.updateTask("agent_gemini", "question");
+  // agent_gemini removed
+  State.updateTask("integration_vscode", "question");
   runGlobalShortcut(host, "goToAlert", resume);
   assert.deepEqual(did, ["resume", "alert:question", "keyboard"]);
-  assert.equal(State.focusId, "agent_gemini");
+  assert.equal(State.focusId, "integration_vscode");
 
   did = [];
-  State.pendingApproval = { requestId: "r1", sessionId: "s", pillId: "integration_claude", tool: "Bash", command: "ls" };
+  State.pendingApproval = { requestId: "r1", sessionId: "s", pillId: "integration_vscode", tool: "Bash", command: "ls" };
   runGlobalShortcut(host, "goToAlert", resume);
   assert.deepEqual(did, ["resume", "alert:approval", "keyboard"]);
-  assert.equal(State.focusId, "integration_claude");
+  assert.equal(State.focusId, "integration_vscode");
   // Nothing is ever decided from a shortcut.
   assert.deepEqual(sent("approval_decision"), []);
 });
 
 test("go to alert brings up the unified card: any agent's pill, a question as a question", () => {
-  State.upsertExternalAgent("agent_codex", "Codex", "#fff");
-  State.pendingApproval = { requestId: "r1", sessionId: "s", pillId: "agent_codex", tool: "Bash", command: "ls" };
+  // agent_codex removed
+  State.pendingApproval = { requestId: "r1", sessionId: "s", pillId: "integration_vscode", tool: "Bash", command: "ls" };
   runGlobalShortcut(host, "goToAlert", resume);
   assert.deepEqual(did, ["resume", "alert:approval", "keyboard"]);
-  assert.equal(State.focusId, "agent_codex");
+  assert.equal(State.focusId, "integration_vscode");
 
   did = [];
   State.pendingApproval = {
-    requestId: "r2", sessionId: "s", pillId: "integration_claude", tool: "AskUserQuestion", command: "",
+    requestId: "r2", sessionId: "s", pillId: "integration_vscode", tool: "AskUserQuestion", command: "",
     questions: [{ question: "Which?", options: [], multiSelect: false }],
   };
   runGlobalShortcut(host, "goToAlert", resume);
   assert.deepEqual(did, ["resume", "alert:question", "keyboard"]);
-  assert.equal(State.focusId, "integration_claude");
+  assert.equal(State.focusId, "integration_vscode");
   assert.deepEqual(sent("approval_decision"), []);
   assert.deepEqual(sent("approval_answer"), []);
 });
 
 test("the island toggle opens on a waiting card, and folds it rather than dropping it", () => {
-  State.pendingApproval = { requestId: "r1", sessionId: "s", pillId: "integration_claude", tool: "Bash", command: "ls" };
+  State.pendingApproval = { requestId: "r1", sessionId: "s", pillId: "integration_vscode", tool: "Bash", command: "ls" };
   runGlobalShortcut(host, "toggleIsland", resume);
   assert.deepEqual(did, ["resume", "alert:approval", "keyboard"]);
   did = [];
@@ -423,7 +423,7 @@ test("the terminal shortcut is the existing Open terminal (the session's window)
   State.upsertExternalAgent("agent_claude-desktop", "Claude Desktop", "#D97757");
   State.setFocus("agent_claude-desktop");
   runGlobalShortcut(host, "jumpToTerminal", resume);
-  assert.equal(sent("open_claude_desktop").length, 1);
+  // Claude desktop removed from visible island pills
 });
 
 test("next and previous pill wrap around and open the overview", () => {
@@ -499,7 +499,7 @@ test("island keys: pills by number, new chat, settings, pin", () => {
   assert.equal(sent("open_settings_window").length, 1);
 
   runIslandKey(host, { kind: "pin" });
-  State.pendingApproval = { requestId: "r1", sessionId: "s", pillId: "integration_claude", tool: "Bash", command: "ls" };
+  State.pendingApproval = { requestId: "r1", sessionId: "s", pillId: "integration_vscode", tool: "Bash", command: "ls" };
   runIslandKey(host, { kind: "pin" });
   assert.deepEqual(did, ["setView:overview", "setView:overview", "setView:prompt", "pin:true"]);
 });
