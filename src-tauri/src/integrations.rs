@@ -44,6 +44,87 @@ pub struct IntegrationEvent {
     pub detail: Option<String>,
 }
 
+/// Account names only; GitHub CLI tokens never leave the Rust process.
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubAccount {
+    pub login: String,
+    pub active: bool,
+}
+
+#[derive(Serialize, Clone, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubAuthAccounts {
+    pub cli_installed: bool,
+    pub configured: bool,
+    pub state: String,
+    pub accounts: Vec<GitHubAccount>,
+}
+
+fn parse_github_accounts(root: &Value) -> Vec<GitHubAccount> {
+    root.get("hosts")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|host| host.get("hostname").and_then(Value::as_str) == Some("github.com"))
+        .flat_map(|host| host.get("users").and_then(Value::as_array).into_iter().flatten())
+        .filter_map(|user| {
+            let login = user.get("login")?.as_str()?.trim();
+            (!login.is_empty()).then(|| GitHubAccount {
+                login: login.to_string(),
+                active: user.get("active").and_then(Value::as_bool).unwrap_or(false),
+            })
+        })
+        .collect()
+}
+
+fn github_auth_state(cli_installed: bool, status_valid: bool, status_success: bool, accounts: &[GitHubAccount], legacy_credential: bool) -> (&'static str, bool) {
+    if !cli_installed {
+        return ("missing-cli", legacy_credential);
+    }
+    if !status_valid {
+        return ("error", false);
+    }
+    let configured = accounts.iter().any(|account| account.active) || (accounts.is_empty() && legacy_credential);
+    let state = if configured { "authenticated" } else if status_success { "error" } else { "unauthenticated" };
+    (state, configured)
+}
+
+/// Read account names from `gh auth status`; request no token fields and never
+/// return command output or credentials to the webview.
+pub fn github_auth_accounts() -> GitHubAuthAccounts {
+    #[cfg(windows)]
+    let executable = crate::platform::find_on_path("gh");
+    #[cfg(not(windows))]
+    let executable = Some(std::path::PathBuf::from("gh"));
+
+    let Some(executable) = executable else {
+        let legacy = secrets::get("github-token").is_some();
+        let (state, configured) = github_auth_state(false, false, false, &[], legacy);
+        return GitHubAuthAccounts { configured, state: state.into(), ..GitHubAuthAccounts::default() };
+    };
+    let mut command = Command::new(executable);
+    command
+        .args(["auth", "status", "--json", "hosts", "--hostname", "github.com", "--no-refresh"])
+        .env_remove("GH_TOKEN")
+        .env_remove("GITHUB_TOKEN");
+    #[cfg(windows)]
+    crate::platform::no_console(&mut command);
+
+    let Ok(output) = command.output() else {
+        return GitHubAuthAccounts { cli_installed: true, configured: false, state: "error".into(), accounts: Vec::new() };
+    };
+    let parsed = serde_json::from_slice::<Value>(&output.stdout);
+    let Some(root) = parsed.ok() else {
+        let (state, configured) = github_auth_state(true, false, output.status.success(), &[], false);
+        return GitHubAuthAccounts { cli_installed: true, configured, state: state.into(), accounts: Vec::new() };
+    };
+    let accounts = parse_github_accounts(&root);
+    let legacy = accounts.is_empty() && secrets::get("github-token").is_some();
+    let (state, configured) = github_auth_state(true, true, output.status.success(), &accounts, legacy);
+    GitHubAuthAccounts { cli_installed: true, configured, state: state.into(), accounts }
+}
+
 fn emit(app: &AppHandle, update: IntegrationUpdate) {
     let _ = app.emit_to(WINDOW_LABEL, "integration", update);
 }
@@ -59,25 +140,30 @@ fn client() -> reqwest::Client {
 /// CLI login. `gh auth token` reads its own credential store and prints only to
 /// this process; Mochi never persists or exposes the token to the webview.
 pub fn github_token() -> Option<String> {
-    if let Some(token) = secrets::get("github-token") {
-        return Some(token);
-    }
     #[cfg(windows)]
-    let mut command = {
-        let path = crate::platform::find_on_path("gh")?;
-        Command::new(path)
-    };
+    let mut command = crate::platform::find_on_path("gh").map(Command::new);
     #[cfg(not(windows))]
-    let mut command = Command::new("gh");
-    command.args(["auth", "token"]);
-    #[cfg(windows)]
-    crate::platform::no_console(&mut command);
-    let output = command.output().ok()?;
-    if !output.status.success() {
-        return None;
+    let mut command = Some(Command::new("gh"));
+    if let Some(command) = command.as_mut() {
+        command
+            .args(["auth", "token"])
+            .env_remove("GH_TOKEN")
+            .env_remove("GITHUB_TOKEN");
+        #[cfg(windows)]
+        crate::platform::no_console(command);
+        if let Ok(output) = command.output() {
+            if output.status.success() {
+                if let Ok(token) = String::from_utf8(output.stdout) {
+                    let token = token.trim();
+                    if !token.is_empty() {
+                        return Some(token.to_string());
+                    }
+                }
+            }
+        }
     }
-    let token = String::from_utf8(output.stdout).ok()?.trim().to_string();
-    (!token.is_empty()).then_some(token)
+    // Compatibility for installations that still have the old keychain token.
+    secrets::get("github-token")
 }
 
 /// Set from the tray's Pause item. While it is on, nothing reaches the network:
@@ -300,6 +386,7 @@ async fn poll_stripe(app: AppHandle) {
 // ── GitHub ────────────────────────────────────────────────────────────────────
 
 async fn poll_github(app: AppHandle) {
+    let generation = GITHUB.generation.load(Ordering::SeqCst);
     let Some(token) = github_token() else { return };
     let http = client();
 
@@ -350,7 +437,10 @@ async fn poll_github(app: AppHandle) {
         _ => 0,
     };
 
-    GITHUB.cache.lock().unwrap().stats = Some((public + private, stars));
+    let mut cache = GITHUB.cache.lock().unwrap();
+    if GITHUB.generation.load(Ordering::SeqCst) != generation { return; }
+    cache.stats = Some((public + private, stars));
+    drop(cache);
     emit_github(&app);
 }
 
@@ -477,8 +567,8 @@ async fn run_github_pulse(app: &AppHandle) -> bool {
     if PAUSED.load(Ordering::Relaxed) || !enabled(app, GITHUB_ID) {
         return false;
     }
-    let Some(token) = github_token() else { return false };
     let generation = GITHUB.generation.load(Ordering::SeqCst);
+    let Some(token) = github_token() else { return false };
     GITHUB.pulse_busy.store(true, Ordering::SeqCst);
     let root = github_graphql(&token, github::PULSE_QUERY, "pulse").await;
     GITHUB.pulse_busy.store(false, Ordering::SeqCst);
@@ -506,8 +596,8 @@ async fn run_github_activity(app: &AppHandle) {
     if PAUSED.load(Ordering::Relaxed) || !enabled(app, GITHUB_ID) {
         return;
     }
-    let Some(token) = github_token() else { return };
     let generation = GITHUB.generation.load(Ordering::SeqCst);
+    let Some(token) = github_token() else { return };
     GITHUB.activity_busy.store(true, Ordering::SeqCst);
     let root = github_graphql(&token, github::ACTIVITY_QUERY, "activity").await;
     GITHUB.activity_busy.store(false, Ordering::SeqCst);
@@ -551,8 +641,8 @@ pub fn github_refresh_if_stale(section: &str) {
     }
 }
 
-/// The GitHub token was saved or removed: forget what the old one fetched, drop
-/// its requests still in flight, and fetch again right away.
+/// The GitHub account changed: discard every result for the previous identity,
+/// drop its requests still in flight, and fetch the new account right away.
 pub fn github_token_changed(app: &AppHandle) {
     GITHUB.generation.fetch_add(1, Ordering::SeqCst);
     let has_token = github_token().is_some();
@@ -560,9 +650,7 @@ pub fn github_token_changed(app: &AppHandle) {
         let mut cache = GITHUB.cache.lock().unwrap();
         cache.pulse = None;
         cache.activity = None;
-        if !has_token {
-            cache.stats = None;
-        }
+        cache.stats = None;
     }
     emit_github(app);
     GITHUB.pulse_wake.notify_one();
@@ -570,6 +658,14 @@ pub fn github_token_changed(app: &AppHandle) {
     if has_token && !PAUSED.load(Ordering::Relaxed) && enabled(app, GITHUB_ID) {
         tauri::async_runtime::spawn(poll_github(app.clone()));
     }
+}
+
+/// User requested a full dashboard refresh, including repository statistics,
+/// the PR/review/CI pulse, and contribution activity.
+pub async fn github_refresh_now(app: &AppHandle) {
+    poll_github(app.clone()).await;
+    run_github_pulse(app).await;
+    run_github_activity(app).await;
 }
 
 /// Switching the pill off forgets the pulse, so switching it back on starts
@@ -1034,6 +1130,35 @@ fn fmt_value(v: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn github_auth_status_exposes_only_github_account_names_and_active_state() {
+        let accounts = parse_github_accounts(&json!({ "hosts": [
+            { "hostname": "github.com", "users": [
+                { "login": "octo", "active": true, "oauth_token": "must-not-escape" },
+                { "login": "mochi", "active": false }
+            ] },
+            { "hostname": "ghe.example", "users": [{ "login": "ignored", "active": true }] }
+        ] }));
+        assert_eq!(accounts, vec![
+            GitHubAccount { login: "octo".into(), active: true },
+            GitHubAccount { login: "mochi".into(), active: false },
+        ]);
+        let serialized = serde_json::to_string(&accounts).unwrap();
+        assert!(!serialized.contains("must-not-escape"));
+        assert!(!serialized.contains("oauth_token"));
+    }
+
+    #[test]
+    fn github_auth_state_distinguishes_cli_and_account_conditions() {
+        assert_eq!(github_auth_state(false, false, false, &[], false), ("missing-cli", false));
+        assert_eq!(github_auth_state(true, false, false, &[], false), ("error", false));
+        assert_eq!(github_auth_state(true, true, false, &[], false), ("unauthenticated", false));
+        let one = [GitHubAccount { login: "octo".into(), active: true }];
+        assert_eq!(github_auth_state(true, true, true, &one, false), ("authenticated", true));
+        let many = [one[0].clone(), GitHubAccount { login: "mochi".into(), active: false }];
+        assert_eq!(github_auth_state(true, true, true, &many, false), ("authenticated", true));
+    }
 
     #[test]
     fn github_card_data_sends_only_what_is_known() {

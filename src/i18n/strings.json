@@ -13,6 +13,24 @@
   "id"
  ],
  "strings": {
+  "Current account": {
+   "zh-Hans": "当前账户", "hi": "वर्तमान खाता", "es": "Cuenta actual", "ar": "الحساب الحالي", "fr": "Compte actuel", "bn": "বর্তমান অ্যাকাউন্ট", "pt-BR": "Conta atual", "ru": "Текущий аккаунт", "id": "Akun saat ini"
+  },
+  "Switch to {login}": {
+   "zh-Hans": "切换到 {login}", "hi": "{login} पर स्विच करें", "es": "Cambiar a {login}", "ar": "التبديل إلى {login}", "fr": "Basculer vers {login}", "bn": "{login}-এ পরিবর্তন করুন", "pt-BR": "Trocar para {login}", "ru": "Переключиться на {login}", "id": "Beralih ke {login}"
+  },
+  "Choose GitHub account": {
+   "zh-Hans": "选择 GitHub 账户", "hi": "GitHub खाता चुनें", "es": "Elige una cuenta de GitHub", "ar": "اختر حساب GitHub", "fr": "Choisir un compte GitHub", "bn": "GitHub অ্যাকাউন্ট বেছে নিন", "pt-BR": "Escolha uma conta do GitHub", "ru": "Выберите аккаунт GitHub", "id": "Pilih akun GitHub"
+  },
+  "Disconnect GitHub account": {
+   "zh-Hans": "断开 GitHub 账户", "hi": "GitHub खाते से डिस्कनेक्ट करें", "es": "Desconectar cuenta de GitHub", "ar": "قطع اتصال حساب GitHub", "fr": "Déconnecter le compte GitHub", "bn": "GitHub অ্যাকাউন্ট বিচ্ছিন্ন করুন", "pt-BR": "Desconectar conta do GitHub", "ru": "Отключить аккаунт GitHub", "id": "Putuskan akun GitHub"
+  },
+  "Disconnect a GitHub account": {
+   "zh-Hans": "断开 GitHub 账户", "hi": "GitHub खाते से डिस्कनेक्ट करें", "es": "Desconectar una cuenta de GitHub", "ar": "قطع اتصال حساب GitHub", "fr": "Déconnecter un compte GitHub", "bn": "একটি GitHub অ্যাকাউন্ট বিচ্ছিন্ন করুন", "pt-BR": "Desconectar uma conta do GitHub", "ru": "Отключить аккаунт GitHub", "id": "Putuskan akun GitHub"
+  },
+  "Log out of {login}? This removes its GitHub CLI credentials.": {
+   "zh-Hans": "退出 {login}？这会移除其 GitHub CLI 凭据。", "hi": "{login} से लॉग आउट करें? इससे GitHub CLI क्रेडेंशियल हट जाएंगे।", "es": "¿Cerrar sesión de {login}? Se eliminarán sus credenciales de GitHub CLI.", "ar": "تسجيل الخروج من {login}؟ سيؤدي ذلك إلى إزالة بيانات اعتماد GitHub CLI.", "fr": "Se déconnecter de {login} ? Cela supprime ses identifiants GitHub CLI.", "bn": "{login} থেকে লগ আউট করবেন? এতে GitHub CLI শংসাপত্র মুছে যাবে।", "pt-BR": "Sair de {login}? Isso remove as credenciais do GitHub CLI.", "ru": "Выйти из {login}? Учетные данные GitHub CLI будут удалены.", "id": "Keluar dari {login}? Kredensial GitHub CLI-nya akan dihapus."
+  },
   " is ready.": {
    "zh-Hans": " 已就绪。",
    "hi": " तैयार है।",

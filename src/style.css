@@ -1544,6 +1544,7 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 .int-card {
+  position: relative;
   padding: 10px 12px 0 108px;
   display: flex;
   flex-direction: column;
@@ -1608,6 +1609,145 @@ input[type="range"]::-webkit-slider-thumb {
   align-items: center;
   gap: 8px;
   padding-top: 6px;
+}
+
+.int-head:has(.gh-logout) {
+  padding-right: 0;
+}
+
+.int-head:has(.gh-logout) .gh-spark {
+  overflow: hidden;
+}
+
+.gh-logout {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 3px 6px;
+  border: 1px solid rgba(244, 80, 94, 0.2);
+  border-radius: 7px;
+  color: var(--red-text);
+  background: rgba(244, 80, 94, 0.07);
+  font: 500 9px/1.2 var(--font);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.gh-logout:hover {
+  border-color: rgba(244, 80, 94, 0.38);
+  background: rgba(244, 80, 94, 0.14);
+}
+
+.gh-account-stat {
+  cursor: pointer;
+}
+
+.gh-account-stat .int-stat-label {
+  color: var(--dim-2);
+}
+
+.gh-account-stat:hover:not(:disabled) .int-stat-label {
+  color: var(--ink-2);
+}
+
+.gh-account-stat:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.gh-account-value {
+  max-width: 78px;
+  overflow: hidden;
+  font-size: 9px;
+  text-overflow: ellipsis;
+}
+
+.gh-account-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-top: 6px;
+}
+
+.gh-account-action {
+  padding: 3px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  color: var(--dim-2);
+  background: rgba(255, 255, 255, 0.035);
+  font: 500 9px/1.2 var(--font);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.gh-account-action:hover:not(:disabled) {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.gh-account-action:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.gh-account-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.58);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.gh-account-dialog {
+  width: min(300px, 100%);
+  padding: 14px;
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+}
+
+.gh-account-dialog-title {
+  margin: 0 0 10px;
+  color: var(--ink);
+  font: 600 12px var(--font);
+}
+
+.gh-account-choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 32px;
+  border-top: 1px solid var(--hairline);
+}
+
+.gh-account-choice-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-2);
+  font: 400 11px var(--font);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gh-account-danger {
+  color: var(--red-text);
+  border-color: rgba(244, 80, 94, 0.24);
+}
+
+.gh-account-dialog-close {
+  margin-top: 10px;
+  padding: 4px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 7px;
+  color: var(--dim-2);
+  background: transparent;
+  font: 500 10px var(--font);
+  cursor: pointer;
 }
 
 .int-rows {
@@ -2100,6 +2240,10 @@ input[type="range"]::-webkit-slider-thumb {
   scrollbar-width: none;
 }
 
+.gh-list-ci {
+  max-height: 40px;
+}
+
 .gh-list::-webkit-scrollbar {
   display: none;
 }
@@ -2145,6 +2289,35 @@ input[type="range"]::-webkit-slider-thumb {
   flex: 0 0 auto;
 }
 
+.gh-active-repo {
+  flex: 0 0 auto;
+  padding: 1px 4px;
+  border-radius: 4px;
+  color: var(--green-2);
+  background: rgba(52, 211, 153, 0.1);
+  font: 500 8px var(--font);
+}
+
+.gh-project-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0 2px;
+  color: var(--dim-2);
+  font: 400 10px var(--font);
+}
+
+.gh-project-picker select {
+  max-width: 65%;
+  padding: 3px 6px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  color: var(--ink-2);
+  background: var(--card-flat);
+  font: 400 10px var(--font);
+}
+
 .gh-title {
   font: 400 11px var(--font);
   color: #c5c8cd;
@@ -2160,12 +2333,30 @@ input[type="range"]::-webkit-slider-thumb {
   flex: 0 0 auto;
 }
 
+.gh-review-mark,
+.gh-review-comments {
+  flex: 0 0 auto;
+  color: var(--dim-2);
+  font: 500 9px var(--font);
+}
+
+.gh-review-mark {
+  color: var(--green-2);
+}
+
+.gh-review-comments {
+  color: var(--dim);
+}
+
 .gh-word {
   margin-left: auto;
+  max-width: 110px;
   padding-left: 4px;
   font: 400 10px var(--font);
   white-space: nowrap;
   flex: 0 0 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .gh-empty {

@@ -9,10 +9,13 @@
 import { h, svg, dot } from "./dom";
 import { ICONS } from "./icons";
 import { Bridge } from "../core/bridge";
+import { State } from "../core/state";
+import { t } from "../i18n/i18n";
+import { githubAddAccountRow, githubSwitchAccountRow, githubLogoutButton } from "./github-auth";
 import {
   CI_COLORS, GH_STRINGS, GRID_WEEKS, activityHeader, actionsUrl, ciWord, contributionColor,
-  formatCount, lastDays, lastWeeks, mainCISummary, myPRsValue, profileUrl, safeGitHubUrl,
-  sectionTitle, shortRepo, weekColumn, worstCI,
+  formatCount, lastDays, lastWeeks, mainCISummary, profileUrl, safeGitHubUrl,
+  sectionTitle, shortRepo, weekColumn,
   type ContributionDay, type GitHubActivity, type GitHubPR, type GitHubPulse, type GitHubRepoCI,
   type GitHubSection, type GitHubStats,
 } from "../core/github";
@@ -61,6 +64,8 @@ export function githubPulseCard(
   };
 
   const head = h("div", { class: "int-head" }, dot(GITHUB_RED, 7), h("b", { text: GH_STRINGS.title }));
+  const auth = State.integrations["integration_github"];
+  const activeLogin = auth?.githubAccounts?.find((account) => account.active)?.login;
   if (stats || activity) {
     const spark = h("button", { class: "gh-spark", onclick: () => show("activity") });
     if (stats) spark.append(h("span", { text: `★ ${formatCount(stats.totalStars)}` }));
@@ -69,9 +74,8 @@ export function githubPulseCard(
   } else {
     head.append(h("span", { text: GH_STRINGS.overview }));
   }
+  if (auth?.configured) head.append(githubLogoutButton(auth.githubAccounts ?? []));
 
-  const prColor = CI_COLORS[worstCI(pulse.myPRs.map((p) => p.ci))];
-  const reviews = pulse.toReview.length;
   const main = mainCISummary(pulse.mainCI);
 
   return h(
@@ -81,10 +85,8 @@ export function githubPulseCard(
     h(
       "div",
       { class: "int-stats gh-rows" },
-      statButton(svg(ICONS.pull, 10, { stroke: 2.2 }), prColor, GH_STRINGS.myPRs, myPRsValue(pulse.myPRs),
-        () => show("myPRs")),
-      statButton(svg(ICONS.eye, 10, { stroke: 2.2 }), reviews > 0 ? "#8AB4F8" : "#6B7079", GH_STRINGS.toReview,
-        String(reviews), () => show("toReview")),
+      githubAddAccountRow(GITHUB_RED),
+      githubSwitchAccountRow(GITHUB_RED, activeLogin, (auth?.githubAccounts?.length ?? 0) < 2),
       statButton(svg(main.failing ? ICONS.octagonX : ICONS.seal, 10, { evenOdd: true }), main.color,
         GH_STRINGS.mainCI, main.value, () => show("mainCI")),
     ),
@@ -118,23 +120,46 @@ function row(onOpen: () => void, ...children: (HTMLElement | null)[]): HTMLEleme
 }
 
 function prRow(pr: GitHubPR, showCI: boolean): HTMLElement {
+  const reviewTitle = pr.review === "approved" ? t("Review approved")
+    : pr.review === "changesRequested" ? t("Changes requested")
+      : pr.review === "pending" ? t("Review pending") : "";
+  const reviewMark = showCI && reviewTitle
+    ? h("span", { class: "gh-review-mark", title: reviewTitle, text: pr.review === "approved" ? "✓" : pr.review === "changesRequested" ? "!" : "…" })
+    : null;
+  const comments = !showCI && pr.reviewComments > 0
+    ? h("span", { class: "gh-review-comments", title: t("Review comments: {count}", { count: pr.reviewComments }), text: `◌ ${pr.reviewComments}` })
+    : null;
   return row(
     () => open(pr.url),
     showCI ? ciDot(pr.ci) : h("i", { class: "gh-gap" }),
     h("span", { class: "gh-ref", text: `${shortRepo(pr.repo)}#${pr.number}` }),
     h("span", { class: "gh-title", text: pr.title }),
+    reviewMark,
+    comments,
     pr.isDraft ? h("span", { class: "gh-draft", text: GH_STRINGS.draft }) : null,
   );
 }
 
-function repoRow(repo: GitHubRepoCI): HTMLElement {
-  const word = ciWord(repo.ci);
+function repoRow(repo: GitHubRepoCI, login: string): HTMLElement {
+  const word = ciWord(repo.ci) ?? t("No checks reported");
+  const checkedAt = repo.checkedAt ? new Date(repo.checkedAt) : null;
+  const dateText = checkedAt && Number.isFinite(checkedAt.getTime())
+    ? checkedAt.toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })
+    : "";
+  const preferenceKey = `mochi.github.activeRepository.${login}`;
+  const active = (() => { try { return localStorage.getItem(preferenceKey) === repo.repo; } catch { return false; } })();
   return row(
     () => open(actionsUrl(repo.url)),
     ciDot(repo.ci),
     h("span", { class: "gh-ref", text: shortRepo(repo.repo) }),
     h("span", { class: "gh-title", text: repo.branch }),
-    word ? h("span", { class: "gh-word", style: `color:${CI_COLORS[repo.ci]}`, text: word }) : null,
+    active ? h("span", { class: "gh-active-repo", text: t("Active") }) : null,
+    h("span", {
+      class: "gh-word",
+      style: `color:${CI_COLORS[repo.ci]}`,
+      title: dateText ? t("Last checked {date}", { date: checkedAt!.toLocaleString() }) : word,
+      text: dateText ? `${word} · ${dateText}` : word,
+    }),
   );
 }
 
@@ -164,17 +189,39 @@ export function openRow(el: HTMLElement | undefined) {
 function listDetail(section: Exclude<GitHubSection, "activity">, pulse: GitHubPulse, onBack: () => void): HTMLElement {
   const rows: HTMLElement[] =
     section === "mainCI"
-      ? pulse.mainCI.map(repoRow)
+      ? pulse.mainCI.map((repo) => repoRow(repo, pulse.login))
       : (section === "myPRs" ? pulse.myPRs : pulse.toReview).map((pr) => prRow(pr, section === "myPRs"));
   const body =
     rows.length === 0
       ? h("div", { class: "gh-empty", text: GH_STRINGS.nothingHere })
-      : h("div", { class: rows.length > 3 ? "gh-list fade" : "gh-list" }, ...rows);
+      : h("div", { class: `${section === "mainCI" ? "gh-list gh-list-ci" : "gh-list"}${rows.length > 3 ? " fade" : ""}` }, ...rows);
+
+  const activeProject = section === "mainCI" && pulse.mainCI.length > 0
+    ? h("label", { class: "gh-project-picker" },
+        h("span", { text: t("Active project") }),
+        (() => {
+          const picker = h("select", { "aria-label": t("Active project") });
+          picker.append(h("option", { value: "", text: t("Choose active project") }));
+          for (const repo of pulse.mainCI) picker.append(h("option", { value: repo.repo, text: repo.repo }));
+          const preferenceKey = `mochi.github.activeRepository.${pulse.login}`;
+          try { picker.value = localStorage.getItem(preferenceKey) ?? ""; } catch { /* storage may be disabled */ }
+          picker.addEventListener("change", () => {
+            try {
+              if (picker.value) localStorage.setItem(preferenceKey, picker.value);
+              else localStorage.removeItem(preferenceKey);
+            } catch { /* preference is optional */ }
+            State.notify();
+          });
+          return picker;
+        })(),
+      )
+    : null;
 
   return h(
     "div",
     { class: "int-card" },
     h("div", { class: "gh-detail-head" }, backButton(sectionTitle(section), onBack)),
+    activeProject,
     body,
   );
 }

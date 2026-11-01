@@ -1,6 +1,72 @@
 {
  "_about": "Windows-only translations keyed by English text. See src/i18n/i18n.ts.",
  "strings": {
+  "GitHub CLI is not installed": {
+   "zh-Hans": "未安装 GitHub CLI", "hi": "GitHub CLI इंस्टॉल नहीं है", "es": "GitHub CLI no está instalado", "ar": "GitHub CLI غير مثبت", "fr": "GitHub CLI n’est pas installé", "bn": "GitHub CLI ইনস্টল করা নেই", "pt-BR": "GitHub CLI não está instalado", "ru": "GitHub CLI не установлен", "id": "GitHub CLI belum terpasang"
+  },
+  "Could not read GitHub CLI account status": {
+   "zh-Hans": "无法读取 GitHub CLI 账户状态", "hi": "GitHub CLI खाते की स्थिति नहीं पढ़ सके", "es": "No se pudo leer el estado de la cuenta de GitHub CLI", "ar": "تعذرت قراءة حالة حساب GitHub CLI", "fr": "Impossible de lire l’état du compte GitHub CLI", "bn": "GitHub CLI অ্যাকাউন্টের অবস্থা পড়া যায়নি", "pt-BR": "Não foi possível ler o estado da conta do GitHub CLI", "ru": "Не удалось прочитать состояние аккаунта GitHub CLI", "id": "Tidak dapat membaca status akun GitHub CLI"
+  },
+  "Sign in to GitHub CLI to load your activity": {
+   "zh-Hans": "登录 GitHub CLI 以加载活动", "hi": "गतिविधि लोड करने के लिए GitHub CLI में साइन इन करें", "es": "Inicia sesión en GitHub CLI para cargar tu actividad", "ar": "سجّل الدخول إلى GitHub CLI لتحميل نشاطك", "fr": "Connectez-vous à GitHub CLI pour charger votre activité", "bn": "কার্যকলাপ লোড করতে GitHub CLI-তে সাইন ইন করুন", "pt-BR": "Entre no GitHub CLI para carregar sua atividade", "ru": "Войдите в GitHub CLI, чтобы загрузить активность", "id": "Masuk ke GitHub CLI untuk memuat aktivitas"
+  },
+  "No checks reported": {
+   "zh-Hans": "未报告检查结果", "hi": "कोई जाँच परिणाम नहीं मिला", "es": "No se informaron comprobaciones", "ar": "لم يتم الإبلاغ عن فحوصات", "fr": "Aucune vérification signalée", "bn": "কোনো পরীক্ষার ফল জানানো হয়নি", "pt-BR": "Nenhuma verificação informada", "ru": "Проверки не найдены", "id": "Tidak ada pemeriksaan yang dilaporkan"
+  },
+  "Last checked {date}": {
+   "zh-Hans": "上次检查：{date}", "hi": "आखिरी जाँच {date} को", "es": "Última comprobación: {date}", "ar": "آخر فحص: {date}", "fr": "Dernière vérification : {date}", "bn": "সর্বশেষ পরীক্ষা {date}", "pt-BR": "Última verificação: {date}", "ru": "Последняя проверка: {date}", "id": "Terakhir diperiksa {date}"
+  },
+  "Review approved": {
+   "zh-Hans": "审核已通过", "hi": "समीक्षा स्वीकृत", "es": "Revisión aprobada", "ar": "تمت الموافقة على المراجعة", "fr": "Révision approuvée", "bn": "পর্যালোচনা অনুমোদিত", "pt-BR": "Revisão aprovada", "ru": "Проверка одобрена", "id": "Tinjauan disetujui"
+  },
+  "Changes requested": {
+   "zh-Hans": "请求更改", "hi": "बदलाव का अनुरोध", "es": "Cambios solicitados", "ar": "طُلبت تغييرات", "fr": "Modifications demandées", "bn": "পরিবর্তনের অনুরোধ", "pt-BR": "Alterações solicitadas", "ru": "Запрошены изменения", "id": "Perubahan diminta"
+  },
+  "Review pending": {
+   "zh-Hans": "等待审核", "hi": "समीक्षा लंबित", "es": "Revisión pendiente", "ar": "المراجعة معلقة", "fr": "Révision en attente", "bn": "পর্যালোচনা বাকি", "pt-BR": "Revisão pendente", "ru": "Проверка ожидается", "id": "Tinjauan tertunda"
+  },
+  "Review comments: {count}": {
+   "zh-Hans": "审核评论：{count}", "hi": "समीक्षा टिप्पणियाँ: {count}", "es": "Comentarios de revisión: {count}", "ar": "تعليقات المراجعة: {count}", "fr": "Commentaires de révision : {count}", "bn": "পর্যালোচনা মন্তব্য: {count}", "pt-BR": "Comentários de revisão: {count}", "ru": "Комментарии к проверке: {count}", "id": "Komentar tinjauan: {count}"
+  },
+  "Active": {
+   "zh-Hans": "活跃", "hi": "सक्रिय", "es": "Activo", "ar": "نشط", "fr": "Actif", "bn": "সক্রিয়", "pt-BR": "Ativo", "ru": "Активный", "id": "Aktif"
+  },
+  "Active project": {
+   "zh-Hans": "活跃项目", "hi": "सक्रिय प्रोजेक्ट", "es": "Proyecto activo", "ar": "المشروع النشط", "fr": "Projet actif", "bn": "সক্রিয় প্রকল্প", "pt-BR": "Projeto ativo", "ru": "Активный проект", "id": "Proyek aktif"
+  },
+  "Choose active project": {
+   "zh-Hans": "选择活跃项目", "hi": "सक्रिय प्रोजेक्ट चुनें", "es": "Elige el proyecto activo", "ar": "اختر المشروع النشط", "fr": "Choisir le projet actif", "bn": "সক্রিয় প্রকল্প বেছে নিন", "pt-BR": "Escolha o projeto ativo", "ru": "Выберите активный проект", "id": "Pilih proyek aktif"
+  },
+  "Install GitHub CLI": {
+   "zh-Hans": "安装 GitHub CLI", "hi": "GitHub CLI इंस्टॉल करें", "es": "Instalar GitHub CLI", "ar": "تثبيت GitHub CLI", "fr": "Installer GitHub CLI", "bn": "GitHub CLI ইনস্টল করুন", "pt-BR": "Instalar GitHub CLI", "ru": "Установить GitHub CLI", "id": "Pasang GitHub CLI"
+  },
+  "Log out": {
+   "zh-Hans": "退出登录", "hi": "लॉग आउट करें", "es": "Cerrar sesión", "ar": "تسجيل الخروج", "fr": "Se déconnecter", "bn": "লগ আউট করুন", "pt-BR": "Sair", "ru": "Выйти", "id": "Keluar"
+  },
+  "Add account": {
+   "zh-Hans": "添加账户", "hi": "खाता जोड़ें", "es": "Añadir cuenta", "ar": "إضافة حساب", "fr": "Ajouter un compte", "bn": "অ্যাকাউন্ট যোগ করুন", "pt-BR": "Adicionar conta", "ru": "Добавить аккаунт", "id": "Tambahkan akun"
+  },
+  "Log out of {login}": {
+   "zh-Hans": "退出 {login} 的登录", "hi": "{login} से लॉग आउट करें", "es": "Cerrar sesión de {login}", "ar": "تسجيل الخروج من {login}", "fr": "Se déconnecter de {login}", "bn": "{login} থেকে লগ আউট করুন", "pt-BR": "Sair de {login}", "ru": "Выйти из аккаунта {login}", "id": "Keluar dari {login}"
+  },
+  "Switch account": {
+   "zh-Hans": "切换账户", "hi": "खाता बदलें", "es": "Cambiar cuenta", "ar": "تبديل الحساب", "fr": "Changer de compte", "bn": "অ্যাকাউন্ট বদলান", "pt-BR": "Trocar conta", "ru": "Сменить аккаунт", "id": "Ganti akun"
+  },
+  "GitHub account {action} failed (exit code {code}). Check your GitHub CLI setup and try again.": {
+   "zh-Hans": "GitHub {action}失败（退出代码 {code}）。请检查 GitHub CLI 配置后重试。",
+   "hi": "GitHub {action} विफल हुआ (निकास कोड {code})। GitHub CLI सेटअप जाँचकर फिर कोशिश करें।",
+   "es": "No se pudo {action} de GitHub (código de salida {code}). Revisa GitHub CLI y vuelve a intentarlo.",
+   "ar": "تعذّر {action} في GitHub (رمز الخروج {code}). تحقّق من إعداد GitHub CLI وحاول مجددًا.",
+   "fr": "Échec de {action} GitHub (code de sortie {code}). Vérifie la configuration de GitHub CLI et réessaie.",
+   "bn": "GitHub {action} ব্যর্থ হয়েছে (প্রস্থান কোড {code})। GitHub CLI সেটআপ পরীক্ষা করে আবার চেষ্টা করুন।",
+   "pt-BR": "Falha ao {action} do GitHub (código de saída {code}). Verifique o GitHub CLI e tente novamente.",
+   "ru": "Не удалось выполнить действие «{action}» GitHub (код выхода {code}). Проверьте GitHub CLI и повторите попытку.",
+   "id": "Gagal {action} GitHub (kode keluar {code}). Periksa pengaturan GitHub CLI lalu coba lagi."
+  },
+  "GitHub account setup was cancelled. You can retry from the GitHub card.": {
+   "zh-Hans": "GitHub 账户设置已取消。你可以从 GitHub 卡片重试。", "hi": "GitHub खाता सेटअप रद्द किया गया। GitHub कार्ड से फिर कोशिश कर सकते हैं।", "es": "Se canceló la configuración de GitHub. Puedes volver a intentarlo desde la tarjeta de GitHub.", "ar": "تم إلغاء إعداد حساب GitHub. يمكنك إعادة المحاولة من بطاقة GitHub.", "fr": "La configuration du compte GitHub a été annulée. Réessayez depuis la carte GitHub.", "bn": "GitHub অ্যাকাউন্ট সেটআপ বাতিল হয়েছে। GitHub কার্ড থেকে আবার চেষ্টা করতে পারেন।", "pt-BR": "A configuração da conta do GitHub foi cancelada. Você pode tentar novamente no cartão do GitHub.", "ru": "Настройка аккаунта GitHub отменена. Повторите попытку с карточки GitHub.", "id": "Penyiapan akun GitHub dibatalkan. Anda dapat mencoba lagi dari kartu GitHub."
+  },
+
   " · until {date}": {
    "zh-Hans": " · 截至 {date}",
    "hi": " · {date} तक",

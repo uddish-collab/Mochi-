@@ -64,6 +64,7 @@ pub struct GitHubPr {
     pub is_draft: bool,
     pub ci: CiState,
     pub review: ReviewState,
+    pub review_comments: u64,
     /// Oid of the PR's last commit, when GitHub returned it.
     pub head_sha: Option<String>,
 }
@@ -75,6 +76,8 @@ pub struct GitHubRepoCi {
     pub url: String,
     pub branch: String,
     pub ci: CiState,
+    /// Time reported by GitHub for the most recent check on the default branch.
+    pub checked_at: Option<String>,
     /// Oid of the default branch's head commit, when GitHub returned it.
     pub head_sha: Option<String>,
 }
@@ -139,6 +142,15 @@ fn nodes<'a>(parent: Option<&'a Value>) -> &'a [Value] {
         .unwrap_or(&[])
 }
 
+fn latest_check_at(rollup: &Value) -> Option<String> {
+    let contexts = rollup.get("contexts")?;
+    nodes(Some(contexts))
+        .iter()
+        .filter_map(|node| str_at(node, "completedAt").or_else(|| str_at(node, "createdAt")).or_else(|| str_at(node, "startedAt")))
+        .max()
+        .map(str::to_string)
+}
+
 impl GitHubPulse {
     /// Parses the pulse GraphQL response. None when there is no `data.viewer`.
     pub fn parse(root: &Value, now_ms: u64) -> Option<Self> {
@@ -173,6 +185,7 @@ impl GitHubPulse {
                 is_draft,
                 ci: CiState::from_github(ci_raw),
                 review,
+                review_comments: node.get("reviewThreads").and_then(|v| v.get("totalCount")).and_then(Value::as_u64).unwrap_or(0),
                 head_sha,
             });
         }
@@ -194,12 +207,16 @@ impl GitHubPulse {
             let ci_raw = target
                 .and_then(|t| t.get("statusCheckRollup"))
                 .and_then(|r| str_at(r, "state"));
+            let checked_at = target
+                .and_then(|t| t.get("statusCheckRollup"))
+                .and_then(latest_check_at);
             let head_sha = target.and_then(|t| str_at(t, "oid")).map(str::to_string);
             main_ci.push(GitHubRepoCi {
                 repo: repo.to_string(),
                 url: url.to_string(),
                 branch: branch.to_string(),
                 ci: CiState::from_github(ci_raw),
+                checked_at,
                 head_sha,
             });
         }
@@ -220,6 +237,7 @@ impl GitHubPulse {
                 is_draft,
                 ci: CiState::Unknown,
                 review: ReviewState::Pending,
+                review_comments: node.get("reviewThreads").and_then(|v| v.get("totalCount")).and_then(Value::as_u64).unwrap_or(0),
                 head_sha: None,
             });
         }
@@ -370,18 +388,25 @@ query {
     pullRequests(states: OPEN, first: 20, orderBy: {field: UPDATED_AT, direction: DESC}) {
       nodes {
         number title url isDraft reviewDecision
+        reviewThreads(first: 1) { totalCount }
         repository { nameWithOwner url }
         commits(last: 1) {
           nodes { commit { oid statusCheckRollup { state } } }
         }
       }
     }
-    repositories(first: 10, ownerAffiliations: [OWNER], orderBy: {field: PUSHED_AT, direction: DESC}) {
+    repositories(first: 100, affiliations: [OWNER, COLLABORATOR, ORGANIZATION_MEMBER], orderBy: {field: PUSHED_AT, direction: DESC}) {
       nodes {
         nameWithOwner url isArchived
         defaultBranchRef {
           name
-          target { ... on Commit { oid statusCheckRollup { state } } }
+          target { ... on Commit { oid statusCheckRollup {
+            state
+            contexts(first: 20) { nodes {
+              ... on CheckRun { completedAt startedAt }
+              ... on StatusContext { createdAt }
+            } }
+          } } }
         }
       }
     }
@@ -391,6 +416,7 @@ query {
     nodes {
       ... on PullRequest {
         number title url isDraft
+        reviewThreads(first: 1) { totalCount }
         author { login }
         repository { nameWithOwner url }
       }
@@ -455,7 +481,11 @@ mod tests {
                 {
                   "nameWithOwner": "testuser/myrepo", "url": "https://github.com/testuser/myrepo",
                   "isArchived": false,
-                  "defaultBranchRef": {"name": "main", "target": {"oid": "bbb", "statusCheckRollup": {"state": "PENDING"}}}
+                  "defaultBranchRef": {"name": "main", "target": {"oid": "bbb", "statusCheckRollup": {
+                    "state": "PENDING", "contexts": {"nodes": [
+                      {"completedAt": "2026-10-31T10:00:00Z"}, {"createdAt": "2026-10-31T11:00:00Z"}
+                    ]}
+                  }}}
                 },
                 {
                   "nameWithOwner": "testuser/archived", "url": "https://github.com/testuser/archived",
@@ -470,6 +500,7 @@ mod tests {
                 "number": 7, "title": "Review this",
                 "url": "https://github.com/other/repo/pull/7",
                 "isDraft": false, "author": {"login": "otheruser"},
+                "reviewThreads": {"totalCount": 3},
                 "repository": {"nameWithOwner": "other/repo", "url": "https://github.com/other/repo"}
               }]
             }
@@ -497,12 +528,13 @@ mod tests {
             is_draft: false,
             ci,
             review: ReviewState::Unknown,
+            review_comments: 0,
             head_sha: sha.map(str::to_string),
         }
     }
 
     fn repo(name: &str, ci: CiState, sha: Option<&str>) -> GitHubRepoCi {
-        GitHubRepoCi { repo: name.into(), url: String::new(), branch: "main".into(), ci, head_sha: sha.map(str::to_string) }
+        GitHubRepoCi { repo: name.into(), url: String::new(), branch: "main".into(), ci, checked_at: None, head_sha: sha.map(str::to_string) }
     }
 
     #[test]
@@ -521,8 +553,10 @@ mod tests {
         assert_eq!(p.main_ci[0].repo, "testuser/myrepo");
         assert_eq!(p.main_ci[0].ci, CiState::Pending);
         assert_eq!(p.main_ci[0].branch, "main");
+        assert_eq!(p.main_ci[0].checked_at.as_deref(), Some("2026-10-31T11:00:00Z"));
         assert_eq!(p.main_ci[0].head_sha.as_deref(), Some("bbb"));
         assert_eq!(p.to_review.len(), 1);
+        assert_eq!(p.to_review[0].review_comments, 3);
         assert_eq!(p.to_review[0].id, "other/repo#7");
         assert_eq!(p.to_review[0].review, ReviewState::Pending);
         assert!(p.has_pending(), "default branch pending");

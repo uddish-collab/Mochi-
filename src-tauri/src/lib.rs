@@ -467,25 +467,107 @@ async fn chat_send(
 
 /// Opens the provider's official CLI so the user can switch its signed-in account.
 #[tauri::command]
-fn account_auth(provider: String) -> Result<(), String> {
+fn github_auth_accounts() -> integrations::GitHubAuthAccounts {
+    integrations::github_auth_accounts()
+}
+
+fn valid_github_login(login: &str) -> bool {
+    !login.is_empty() && login.len() <= 39
+        && login.bytes().all(|ch| ch.is_ascii_alphanumeric() || ch == b'-')
+        && !login.starts_with('-') && !login.ends_with('-')
+}
+
+fn github_auth_cli_args(provider: &str, account: Option<&str>) -> Result<(&'static str, Vec<String>), String> {
+    let (action, args): (&str, Vec<&str>) = match provider {
+        "github" | "github_add" => ("add", vec!["auth", "login", "--hostname", "github.com"]),
+        "github_switch" => {
+            let login = account.ok_or_else(|| "Choose the GitHub account to switch to.".to_string())?;
+            if !valid_github_login(login) { return Err("The selected GitHub username is invalid. Refresh the account list and try again.".into()); }
+            ("switch", vec!["auth", "switch", "--hostname", "github.com", "--user", login])
+        }
+        "github_logout" => {
+            let login = account.ok_or_else(|| "Choose the GitHub account to disconnect.".to_string())?;
+            if !valid_github_login(login) { return Err("The selected GitHub username is invalid. Refresh the account list and try again.".into()); }
+            ("logout", vec!["auth", "logout", "--hostname", "github.com", "--user", login])
+        }
+        _ => return Err("Unknown GitHub account action.".into()),
+    };
+    Ok((action, args.into_iter().map(str::to_owned).collect()))
+}
+
+#[cfg(windows)]
+const GITHUB_AUTH_CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
+
+#[cfg(windows)]
+fn github_auth_process(gh: &std::path::Path, wt: Option<&std::path::Path>, args: &[String]) -> Command {
+    use std::os::windows::process::CommandExt;
+    if let Some(wt) = wt {
+        let mut command = Command::new(wt);
+        command.args(["--wait", "-w", "new", "new-tab", "--title", "Mochi GitHub"]);
+        command.arg(gh).args(args);
+        command
+    } else {
+        let mut command = Command::new(gh);
+        command.args(args).creation_flags(GITHUB_AUTH_CREATE_NEW_CONSOLE);
+        command
+    }
+}
+
+#[cfg(windows)]
+fn launch_github_auth(app: AppHandle, provider: &str, requested_account: Option<&str>) -> Result<(), String> {
+    let (action, args) = github_auth_cli_args(provider, requested_account)?;
+    let auth = integrations::github_auth_accounts();
+    if !auth.cli_installed { return Err("GitHub CLI (gh) was not found on PATH. Install GitHub CLI, then restart Mochi.".into()); }
+    if action != "add" && !auth.accounts.iter().any(|account| Some(account.login.as_str()) == requested_account) {
+        return Err("That GitHub account is no longer authenticated. Refresh the account list and try again.".into());
+    }
+    let gh = platform::find_on_path("gh").ok_or_else(|| "GitHub CLI (gh) was not found on PATH. Install GitHub CLI, then restart Mochi.".to_string())?;
+    let wt = platform::find_on_path("wt");
+    // --wait keeps a process handle until the user closes the terminal tab,
+    // allowing Mochi to refresh auth state after an interactive CLI session.
+    let mut command = github_auth_process(&gh, wt.as_deref(), &args);
+    command.env_remove("GH_TOKEN").env_remove("GITHUB_TOKEN");
+    for key in ["GEMINI_API_KEY", "GOOGLE_API_KEY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY", "CODEX_API_KEY"] {
+        command.env_remove(key);
+    }
+    let mut child = command.spawn().map_err(|error| format!("Could not launch GitHub CLI in a visible terminal: {error}"))?;
+    std::thread::spawn(move || {
+        let status = child.wait();
+        let (mut success, exit_code) = match status { Ok(status) => (status.success(), status.code()), Err(_) => (false, None) };
+        let mut error = None;
+        if success && action == "logout" {
+            if let Err(credential_error) = secrets::clear("github-token") {
+                error = Some(format!("The GitHub CLI disconnected the account, but Mochi could not clear its older saved credential: {credential_error}"));
+                success = false;
+            }
+        }
+        if success { integrations::github_token_changed(&app); }
+        let _ = app.emit_to(island::WINDOW_LABEL, "github-auth-result", serde_json::json!({
+            "action": action, "success": success, "exitCode": exit_code, "error": error
+        }));
+    });
+    Ok(())
+}
+#[tauri::command]
+fn account_auth(app: AppHandle, provider: String, account: Option<String>) -> Result<(), String> {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
+        if matches!(provider.as_str(), "github" | "github_add" | "github_switch" | "github_logout") {
+            return launch_github_auth(app, &provider, account.as_deref());
+        }
         let binary = match provider.as_str() {
             
             // `&` runs the login flow even when there was no previous account
             // to log out (cmd.exe's `&&` would stop at that first failure).
             "claude_account" => "claude auth logout & claude auth login",
             
-            "github" => "gh auth login",
-            "github_switch" => "gh auth switch",
             _ => return Err("This account is connected through its own desktop app or browser.".into()),
         };
         let executable = match provider.as_str() {
             
             "claude_account" => "claude",
             
-            "github" | "github_switch" => "gh",
             _ => unreachable!(),
         };
         if platform::find_on_path(executable).is_none() {
@@ -504,7 +586,7 @@ fn account_auth(provider: String) -> Result<(), String> {
         })
     }
     #[cfg(not(windows))]
-    { let _ = provider; Err("Account switching from Mochi is currently supported on Windows only.".into()) }
+    { let _ = (app, provider, account); Err("Account sign-in from Mochi is currently supported on Windows only.".into()) }
 }
 
 /// Settings → Local models → Connect: does the server answer, and with which models?
@@ -585,6 +667,11 @@ async fn refresh_integration(app: AppHandle, id: String) {
 #[tauri::command]
 fn github_refresh(section: String) {
     integrations::github_refresh_if_stale(&section);
+}
+
+#[tauri::command]
+async fn github_refresh_now(app: AppHandle) {
+    integrations::github_refresh_now(&app).await;
 }
 
 /// Lets the island write to the same log as the Rust side.
@@ -745,6 +832,7 @@ pub fn run() {
             approval_decline,
             log_line,
             chat_send,
+            github_auth_accounts,
             account_auth,
             local_connect,
             local_set_key,
@@ -755,6 +843,7 @@ pub fn run() {
             secret_clear,
             refresh_integration,
             github_refresh,
+            github_refresh_now,
             open_n8n,
                         open_settings_window,
             
@@ -865,7 +954,39 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::diff_file;
+    use super::{diff_file, github_auth_cli_args};
+    #[cfg(windows)]
+    use super::{github_auth_process, GITHUB_AUTH_CREATE_NEW_CONSOLE};
+
+    #[test]
+    fn github_account_actions_use_explicit_safe_cli_arguments() {
+        assert_eq!(github_auth_cli_args("github_add", None).unwrap(), ("add", vec!["auth", "login", "--hostname", "github.com"].into_iter().map(str::to_owned).collect()));
+        assert_eq!(github_auth_cli_args("github_switch", Some("octo-user")).unwrap(), ("switch", vec!["auth", "switch", "--hostname", "github.com", "--user", "octo-user"].into_iter().map(str::to_owned).collect()));
+        assert_eq!(github_auth_cli_args("github_logout", Some("octo-user")).unwrap(), ("logout", vec!["auth", "logout", "--hostname", "github.com", "--user", "octo-user"].into_iter().map(str::to_owned).collect()));
+        assert!(github_auth_cli_args("github_switch", None).is_err());
+        assert!(github_auth_cli_args("github_logout", Some("octo & whoami")).is_err());
+        assert!(github_auth_cli_args("claude_account", None).is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn github_auth_uses_a_visible_interactive_windows_console() {
+        assert_eq!(GITHUB_AUTH_CREATE_NEW_CONSOLE, 0x10);
+        let (_, args) = github_auth_cli_args("github_add", None).unwrap();
+        let gh = std::path::Path::new(r"C:\Program Files\GitHub CLI\gh.exe");
+        let wt = std::path::Path::new(r"C:\Program Files\Windows Terminal\wt.exe");
+        let terminal = github_auth_process(gh, Some(wt), &args);
+        let terminal_args: Vec<String> = terminal.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect();
+        assert_eq!(terminal.get_program(), wt.as_os_str());
+        assert_eq!(&terminal_args[..6], ["--wait", "-w", "new", "new-tab", "--title", "Mochi GitHub"]);
+        assert_eq!(terminal_args[6], gh.to_string_lossy());
+        assert_eq!(&terminal_args[7..], args.iter().map(String::as_str).collect::<Vec<_>>());
+
+        let fallback = github_auth_process(gh, None, &args);
+        let fallback_args: Vec<String> = fallback.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect();
+        assert_eq!(fallback.get_program(), gh.as_os_str());
+        assert_eq!(fallback_args, args);
+    }
 
     #[test]
     fn only_an_existing_file_by_its_full_path_reaches_the_editor() {

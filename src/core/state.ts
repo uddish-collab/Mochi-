@@ -88,12 +88,20 @@ function taskFor(def: PillDefinition, colors: unknown, name = def.name): AgentTa
   };
 }
 
+/** Account identities from GitHub CLI; credentials never enter frontend state. */
+export interface GitHubAccount {
+  login: string;
+  active: boolean;
+}
+
 /** What an integration poller last reported. */
 export interface IntegrationInfo {
   data: Record<string, unknown>;
   error: string | null;
   loaded: boolean;
   configured: boolean;
+  githubAccounts?: GitHubAccount[];
+  githubAuthState?: "missing-cli" | "authenticated" | "unauthenticated" | "error";
 }
 
 export interface Settings {

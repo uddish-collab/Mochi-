@@ -22,6 +22,7 @@ export interface GitHubPR {
   isDraft: boolean;
   ci: CIState;
   review: ReviewState;
+  reviewComments: number;
   headSha: string | null;
 }
 
@@ -30,6 +31,7 @@ export interface GitHubRepoCI {
   url: string;
   branch: string;
   ci: CIState;
+  checkedAt: string | null;
   headSha: string | null;
 }
 

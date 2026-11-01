@@ -6,8 +6,9 @@ import { onEvent, Bridge, type IntegrationUpdate } from "../core/bridge";
 import { gitHubAlert, type GitHubEvent } from "../core/github";
 import { availablePills } from "../core/pills";
 import { Sound } from "../core/sound";
-import { State } from "../core/state";
+import { State, type GitHubAccount } from "../core/state";
 import type { Island } from "./island";
+import { t } from "../i18n/i18n";
 
 const GITHUB = "integration_github";
 
@@ -16,6 +17,36 @@ const clearTimers = new Map<string, number>();
 export function registerIntegrationHandlers(island: Island) {
   void onEvent<IntegrationUpdate>("integration", (update) => handle(island, update));
   void onEvent<GitHubEvent[]>("github-alerts", handleGitHubAlerts);
+  void onEvent<{
+    action: "add" | "switch" | "logout";
+    success: boolean;
+    exitCode: number | null;
+    error?: string | null;
+  }>("github-auth-result", (result) => {
+    void refreshConfigured();
+    if (result.success) return;
+    if (result.error) {
+      State.noteMessage = result.error;
+      State.view = "note";
+      State.notify();
+      return;
+    }
+    const action = result.action === "add"
+      ? t("Add account")
+      : result.action === "switch" ? t("Switch account") : t("Log out");
+    if (result.exitCode === -1073741510 || result.exitCode === 3221225786) {
+      State.noteMessage = t("GitHub account setup was cancelled. You can retry from the GitHub card.");
+      State.view = "note";
+      State.notify();
+      return;
+    }
+    State.noteMessage = t(
+      "GitHub account {action} failed (exit code {code}). Check your GitHub CLI setup and try again.",
+      { action, code: result.exitCode ?? "unknown" },
+    );
+    State.view = "note";
+    State.notify();
+  });
   void refreshConfigured();
   State.subscribe(refreshGitHubWhenShown);
 }
@@ -55,6 +86,8 @@ export async function refreshConfigured() {
   const hooks = (await Bridge.agentHooksStatus()) ?? null;
   for (const def of availablePills(State.os)) {
     let configured: boolean;
+    let githubAccounts: GitHubAccount[] | undefined;
+    let githubAuthState: "missing-cli" | "authenticated" | "unauthenticated" | "error" | undefined;
     switch (def.connect.kind) {
       case "key":
         configured = (await Bridge.secretPresent(def.connect.key)) ?? false;
@@ -73,13 +106,23 @@ export async function refreshConfigured() {
         configured = true;
         break;
       case "account":
-        configured = def.id === "integration_github"
-          ? (await Bridge.secretPresent("github-token")) ?? false
-          : true;
+        if (def.id === "integration_github") {
+          const auth = await Bridge.githubAuthAccounts();
+          configured = auth?.configured ?? false;
+          githubAccounts = auth?.accounts ?? [];
+          githubAuthState = auth?.state;
+        } else {
+          configured = true;
+        }
         break;
     }
     const info = State.integrations[def.id] ?? { data: {}, error: null, loaded: false, configured: false };
-    State.integrations[def.id] = { ...info, configured };
+    State.integrations[def.id] = {
+      ...info,
+      configured,
+      ...(githubAccounts === undefined ? {} : { githubAccounts }),
+      ...(githubAuthState === undefined ? {} : { githubAuthState }),
+    };
   }
   State.notify();
 }
@@ -104,6 +147,7 @@ function handle(island: Island, update: IntegrationUpdate) {
     error: update.error,
     loaded: update.error ? (previous?.loaded ?? false) : true,
     configured: previous?.configured ?? true,
+    githubAccounts: previous?.githubAccounts,
   };
 
   const event = update.event;

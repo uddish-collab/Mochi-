@@ -5,7 +5,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import type { Settings } from "./state";
+import type { GitHubAccount, Settings } from "./state";
 import type { RecapHistory, RecapPrefs } from "../recap/summary";
 
 export const IS_TAURI =
@@ -142,8 +142,11 @@ export const Bridge = {
   /** One account-backed chat turn. */
   chatSend: (query: string, context: ChatContext | null) =>
     callOrThrow<{ text: string }>("chat_send", { query, context }),
-  /** Opens the account provider's official CLI for account switching. */
-  accountAuth: (provider: string) => callOrThrow<void>("account_auth", { provider }),
+  /** Opens the account provider's official interactive CLI. */
+  accountAuth: (provider: string, account?: string) =>
+    callOrThrow<void>("account_auth", { provider, account: account ?? null }),
+  /** Account names only; GitHub auth tokens stay in Rust and gh's credential store. */
+  githubAuthAccounts: () => call<{ cliInstalled: boolean; configured: boolean; state: "missing-cli" | "authenticated" | "unauthenticated" | "error"; accounts: GitHubAccount[] }>("github_auth_accounts"),
   chatReset: () => call<void>("chat_reset"),
   /** Settings → Local models → Connect: does the server answer, and with which models? */
   /** The custom server's key, bound to the address it is entered for. */
@@ -162,6 +165,8 @@ export const Bridge = {
   refreshIntegration: (id: string) => call<void>("refresh_integration", { id }),
   /** The GitHub card is on screen: refetch that part if it is stale. */
   githubRefresh: (section: "pulse" | "activity") => call<void>("github_refresh", { section }),
+  /** Explicitly refresh every GitHub dashboard section. */
+  githubRefreshNow: () => call<void>("github_refresh_now"),
   /** Opens the configured n8n instance in the browser. */
   openN8n: () => call<void>("open_n8n"),
 

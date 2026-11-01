@@ -13,6 +13,7 @@ import { refreshHookPills } from "../island/integrations";
 import { readActivity, readPulse, readStats } from "../core/github";
 import { githubDetail, githubPulseCard } from "./github";
 import { language, t } from "../i18n/i18n";
+import { githubAccountActions } from "./github-auth";
 
 /** Same shape as the Swift `timeAgo` computed properties. */
 export function timeAgo(value: unknown): string {
@@ -59,7 +60,7 @@ const OPEN_URLS: Record<string, string> = {
 /** IntegrationCardView.statusLabel on macOS. */
 export function idleStatus(
   id: string,
-  info: { configured: boolean; error: string | null } | undefined,
+  info: { configured: boolean; error: string | null; githubAuthState?: string } | undefined,
   chatModel: string,
 ): { label: string; color: string } {
   if (isComingSoon(id)) return { label: t("Coming soon"), color: "#6B7079" };
@@ -73,7 +74,9 @@ export function idleStatus(
   // are in place (Mac #183). A session replaces this card; nothing is loading.
   if (def?.connect.kind === "hooks") return configured ? ok(t("Hooks installed")) : missing(t("Hooks not installed"));
   if (def?.connect.kind === "account") {
-    if (id === "integration_github" && !configured) return missing(t("Sign in with GitHub CLI to load your activity"));
+    if (id === "integration_github" && info?.githubAuthState === "missing-cli") return missing(t("GitHub CLI is not installed"));
+    if (id === "integration_github" && info?.githubAuthState === "error") return missing(t("Could not read GitHub CLI account status"));
+    if (id === "integration_github" && !configured) return missing(t("Sign in to GitHub CLI to load your activity"));
     return ok(t("Open your account in the browser"));
   }
   if (def?.connect.kind === "none") return ok(t("Ready · no setup needed"));
@@ -87,8 +90,6 @@ export function idleStatus(
 
 const ICON_OPEN = '<path d="M7 17 17 7"/><path d="M8 7h9v9"/>';
 const ICON_REFRESH = '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>';
-const ICON_USER = '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/>';
-
 function iconBtn(title: string, color: string, paths: string, onclick: () => void): HTMLElement {
   const b = h("button", { class: "int-icon", title, onclick });
   b.setAttribute("aria-label", title);
@@ -107,6 +108,11 @@ function idleCard(task: AgentTask, _openSettings: () => void): HTMLElement {
 
   const actions = h("div", { class: "int-actions" });
 
+  if (task.id === "integration_github" && info?.githubAuthState === "missing-cli") {
+    actions.append(iconBtn(t("Install GitHub CLI"), task.color, ICON_OPEN, () =>
+      void Bridge.openUrl("https://cli.github.com/")));
+  }
+
   // Open: VS Code opens the app, everything else opens its website.
   if (task.id === "integration_vscode" || OPEN_URLS[task.id]) {
     actions.append(
@@ -119,13 +125,7 @@ function idleCard(task: AgentTask, _openSettings: () => void): HTMLElement {
 
   // GitHub: sign in or switch account.
   if (task.id === "integration_github") {
-    actions.append(iconBtn(
-      configured ? t("Sign in / Switch") : t("Sign in with GitHub CLI"), task.color, ICON_USER,
-      () => void Bridge.accountAuth(configured ? "github_switch" : "github").catch((err) => {
-        State.noteMessage = String(err).replace(/^Error:\s*/, "");
-        State.view = "note";
-        State.notify();
-      })));
+    actions.append(githubAccountActions(configured, info?.githubAccounts ?? [], task.color));
   }
 
   // Refresh, or Settings when something still has to be set up.
@@ -135,7 +135,9 @@ function idleCard(task: AgentTask, _openSettings: () => void): HTMLElement {
   } else if (configured && (hookPill || def?.category !== "ai")) {
     actions.append(
       iconBtn(t("Refresh"), task.color, ICON_REFRESH, () =>
-        void (hookPill ? refreshHookPills() : Bridge.refreshIntegration(task.id))),
+        void (hookPill ? refreshHookPills() : task.id === "integration_github"
+          ? Bridge.githubRefreshNow()
+          : Bridge.refreshIntegration(task.id))),
     );
   }
 
@@ -247,6 +249,7 @@ function statRow(icon: string, color: string, label: string, value: string): HTM
 }
 
 function githubCard(): HTMLElement {
+  const info = State.integrations.integration_github;
   const d = get("integration_github");
   const stars = Number(d.totalStars ?? 0);
   const repos = Number(d.totalRepos ?? 0);
@@ -261,6 +264,10 @@ function githubCard(): HTMLElement {
       statRow(ICONS.star, "#F5A524", t("Total stars"), fmt(stars)),
       statRow(ICONS.stack, "#6B7079", t("Repositories"), String(repos)),
     ),
+    githubAccountActions(info?.configured ?? false, info?.githubAccounts ?? [], "#F4505E"),
+    info?.configured
+      ? iconBtn(t("Refresh"), "#F4505E", ICON_REFRESH, () => void Bridge.githubRefreshNow())
+      : null,
   );
 }
 
