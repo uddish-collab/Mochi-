@@ -74,13 +74,23 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
   title: "Sign in / Switch",
   });
   switchAccount.setAttribute("aria-label", "Sign in / Switch");
-  switchAccount.innerHTML = `
-  <svg viewBox="0 0 24 24" width="16" height="16" fill="none"
-       stroke="currentColor" stroke-width="1.8"
-       stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="8" r="3.5"/>
-    <path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/>
-  </svg>`;
+  const userSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  userSvg.setAttribute("viewBox", "0 0 24 24");
+  userSvg.setAttribute("width", "16");
+  userSvg.setAttribute("height", "16");
+  userSvg.setAttribute("fill", "none");
+  userSvg.setAttribute("stroke", "currentColor");
+  userSvg.setAttribute("stroke-width", "1.8");
+  userSvg.setAttribute("stroke-linecap", "round");
+  userSvg.setAttribute("stroke-linejoin", "round");
+  const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  circle.setAttribute("cx", "12");
+  circle.setAttribute("cy", "8");
+  circle.setAttribute("r", "3.5");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", "M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6");
+  userSvg.append(circle, path);
+  switchAccount.append(userSvg);
   switchAccount.addEventListener("click", async () => {
     const provider = State.settings.chatProvider;
     try { await Bridge.accountAuth(provider); }

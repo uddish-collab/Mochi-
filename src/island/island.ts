@@ -66,6 +66,9 @@ export class Island {
   private todoTasks: TodoTask[] = this.loadTodos();
   private settingsPanelEl!: HTMLElement;
   private settingsOpen = false;
+  private settingsPos: { x: number; y: number } | null = null;
+  private settingsDragging = false;
+  private settingsDragOffset = { x: 0, y: 0 };
 
   private header!: ViewHost;
   private views!: Map<IslandViewName, ViewHost>;
@@ -421,15 +424,62 @@ export class Island {
       closeBtn.style.background = "transparent";
     });
 
+    const headerTitle = h(
+      "div",
+      { style: "display:flex;align-items:center;gap:6px;pointer-events:none;" },
+      h("span", { style: "font-size:13px;font-weight:600;letter-spacing:-0.2px;color:#fff;" }, tl("Settings")),
+    );
+
     const header = h(
       "div",
       {
+        id: "settings-panel-header",
         style:
-          "display:flex;align-items:center;justify-content:space-between;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.08);",
+          "display:flex;align-items:center;justify-content:space-between;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.08);cursor:grab;user-select:none;-webkit-user-select:none;",
       },
-      h("span", { style: "font-size:13px;font-weight:600;letter-spacing:-0.2px;color:#fff;" }, tl("Settings")),
+      headerTitle,
       closeBtn,
     );
+
+    header.addEventListener("pointerdown", (e: PointerEvent) => {
+      if ((e.target as HTMLElement)?.closest("button, a, input, select")) return;
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      this.settingsDragging = true;
+      header.style.cursor = "grabbing";
+      const panelRect = this.settingsPanelEl.getBoundingClientRect();
+      this.settingsDragOffset = {
+        x: e.clientX - panelRect.left,
+        y: e.clientY - panelRect.top,
+      };
+
+      const onPointerMove = (ev: PointerEvent) => {
+        if (!this.settingsDragging || !this.settingsPanelEl) return;
+        const panelW = this.settingsPanelEl.offsetWidth || 260;
+        const panelH = this.settingsPanelEl.offsetHeight || 300;
+        const maxX = Math.max(0, window.innerWidth - panelW);
+        const maxY = Math.max(0, window.innerHeight - panelH);
+        const left = clamp(ev.clientX - this.settingsDragOffset.x, 0, maxX);
+        const top = clamp(ev.clientY - this.settingsDragOffset.y, 0, maxY);
+        this.settingsPos = { x: left, y: top };
+        this.settingsPanelEl.style.left = `${left}px`;
+        this.settingsPanelEl.style.top = `${top}px`;
+        this.pushTodoRect();
+      };
+
+      const onPointerUp = () => {
+        this.settingsDragging = false;
+        header.style.cursor = "grab";
+        window.removeEventListener("pointermove", onPointerMove);
+        window.removeEventListener("pointerup", onPointerUp);
+        this.pushTodoRect();
+      };
+
+      window.addEventListener("pointermove", onPointerMove);
+      window.addEventListener("pointerup", onPointerUp);
+    });
 
     // Section 1: Active Pills
     const pillsTitle = h("div", {
@@ -610,19 +660,31 @@ export class Island {
 
     private positionSettingsPanel() {
     if (!this.settingsOpen || !this.settingsPanelEl) return;
+    const panelW = this.settingsPanelEl.offsetWidth || 260;
+    const panelH = this.settingsPanelEl.offsetHeight || 300;
+    const maxX = Math.max(0, window.innerWidth - panelW);
+    const maxY = Math.max(0, window.innerHeight - panelH);
+
+    if (this.settingsPos != null) {
+      const left = clamp(this.settingsPos.x, 0, maxX);
+      const top = clamp(this.settingsPos.y, 0, maxY);
+      this.settingsPos = { x: left, y: top };
+      this.settingsPanelEl.style.left = `${left}px`;
+      this.settingsPanelEl.style.top = `${top}px`;
+      this.pushTodoRect();
+      return;
+    }
+
     const r = this.islandRect();
     const SETTINGS_GAP = 10;
-    const panelW = 260;
-    const panelH = this.settingsPanelEl.offsetHeight || 300;
-    const maxX = Math.max(0, window.innerWidth - panelW - 10);
-    const maxY = Math.max(0, window.innerHeight - panelH - 10);
     let left = r.x + r.w + SETTINGS_GAP;
-    if (left > maxX && r.x - panelW - SETTINGS_GAP >= 10) {
+    if (left > maxX && r.x - panelW - SETTINGS_GAP >= 0) {
       left = r.x - panelW - SETTINGS_GAP;
     } else {
-      left = clamp(left, 10, maxX);
+      left = clamp(left, 0, maxX);
     }
-    const top = clamp(r.y, 10, maxY);
+    const top = clamp(r.y, 0, maxY);
+    this.settingsPos = { x: left, y: top };
     this.settingsPanelEl.style.left = `${left}px`;
     this.settingsPanelEl.style.top = `${top}px`;
     this.pushTodoRect();
@@ -813,11 +875,13 @@ export class Island {
     // Same icon box as the native icon next to it; stroke follows the button's colour.
     const refSvg = plusBtn?.querySelector("svg");
     const iconPx = refSvg?.getAttribute("width") ?? "14";
-    todoBtn.innerHTML =
-      `<svg viewBox="0 0 24 24" width="${iconPx}" height="${iconPx}" fill="none" ` +
-      `stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ` +
-      `aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>` +
-      `<path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 17h4"/></svg>`;
+    todoBtn.append(
+      svg(
+        "M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z M14 3v5h5 M9 13h6 M9 17h4",
+        Number(iconPx) || 14,
+        { stroke: 2 },
+      ),
+    );
     if (plusBtn) {
       todoBtn.className = plusBtn.className;
       plusBtn.after(todoBtn);
@@ -1266,6 +1330,7 @@ export class Island {
     // island's place in it moves with it, so Rust is told again.
     window.addEventListener("resize", () => {
       this.pushedRect = { x: -1, y: -1, w: -1, h: -1 };
+      if (this.settingsOpen) this.positionSettingsPanel();
       this.pushTodoRect();
       this.dirty = true;
       this.ensureRunning();

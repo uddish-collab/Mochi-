@@ -23,6 +23,9 @@ class FakeElement {
     this.attributes = new Map();
     this.listeners = new Map();
     this.className = "";
+    this.id = "";
+    this.width = 100;
+    this.height = 100;
     this.title = "";
     this.dataset = {};
     this.scrollTop = 0;
@@ -66,6 +69,16 @@ class FakeElement {
   }
   setAttribute(k, v) {
     this.attributes.set(k, String(v));
+    if (k === "id") this.id = String(v);
+    if (k === "style" && typeof v === "string") {
+      for (const rule of v.split(";")) {
+        const [prop, val] = rule.split(":").map((s) => s.trim());
+        if (prop && val) {
+          const camel = prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+          this.style[camel] = val;
+        }
+      }
+    }
   }
   getAttribute(k) {
     return this.attributes.get(k) ?? null;
@@ -105,6 +118,58 @@ class FakeElement {
     this.parentNode?.removeChild(this);
   }
   /** `.a.b` class selectors only: the first descendant carrying every class. */
+  closest(selector) {
+    const tags = selector.split(",").map((s) => s.trim().toUpperCase());
+    let curr = this;
+    while (curr) {
+      if (curr.tagName && tags.includes(curr.tagName)) return curr;
+      curr = curr.parentNode;
+    }
+    return null;
+  }
+  getContext() {
+    return {
+      canvas: this,
+      clearRect() {},
+      fillRect() {},
+      beginPath() {},
+      moveTo() {},
+      lineTo() {},
+      stroke() {},
+      fill() {},
+      arc() {},
+      save() {},
+      setTransform() {},
+      getTransform() { return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }; },
+      restore() {},
+      scale() {},
+      translate() {},
+      rotate() {},
+      drawImage() {},
+      measureText() { return { width: 0 }; },
+      createLinearGradient() { return { addColorStop() {} }; },
+      createRadialGradient() { return { addColorStop() {} }; },
+      clip() {},
+      arcTo() {},
+      closePath() {},
+      quadraticCurveTo() {},
+      bezierCurveTo() {},
+    };
+  }
+  querySelectorAll(selector) {
+    return this.find(selector);
+  }
+  after(...nodes) {
+    if (!this.parentNode) return;
+    const idx = this.parentNode.childNodes.indexOf(this);
+    if (idx !== -1) {
+      for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+        n.parentNode = this.parentNode;
+        this.parentNode.childNodes.splice(idx + 1 + i, 0, n);
+      }
+    }
+  }
   querySelector(selector) {
     const wanted = selector.split(".").filter(Boolean);
     return [...this.walk()].find((e) => wanted.every((c) => e.classList.contains(c))) ?? null;
@@ -128,12 +193,24 @@ class FakeElement {
   }
 }
 
+class FakePath2D {
+  arc() {}
+  rect() {}
+  closePath() {}
+  moveTo() {}
+  lineTo() {}
+  bezierCurveTo() {}
+  quadraticCurveTo() {}
+}
+
 export function installFakeDom() {
+  globalThis.Path2D = FakePath2D;
   globalThis.requestAnimationFrame = (fn) => fn();
   globalThis.document = {
     createElement: (tag) => new FakeElement(tag),
     createElementNS: (ns, tag) => new FakeElement(tag, ns),
     createTextNode: (text) => new FakeText(text),
+    documentElement: new FakeElement("html"),
     body: new FakeElement("body"),
   };
   return { root: () => new FakeElement("div") };
